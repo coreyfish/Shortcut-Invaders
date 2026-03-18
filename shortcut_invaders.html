@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a1a; color: #00ff88; font-family: 'Courier New', monospace; overflow: hidden; user-select: none; }
+  canvas { display: block; }
+  #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  #hud { display: flex; justify-content: space-between; padding: 10px 16px; font-size: 14px; color: #00ff88; }
+  #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); pointer-events: all; }
+  #overlay h1 { font-size: 28px; color: #00ff88; margin-bottom: 8px; letter-spacing: 4px; }
+  #overlay p { font-size: 13px; color: #aaa; margin: 4px 0; text-align: center; max-width: 400px; }
+  #overlay .big { font-size: 16px; color: #ffcc00; margin: 12px 0 4px; }
+  #overlay button { margin-top: 20px; padding: 10px 28px; background: #00ff88; color: #000; border: none; font-family: 'Courier New', monospace; font-size: 14px; font-weight: bold; cursor: pointer; letter-spacing: 2px; }
+  #overlay button:hover { background: #00cc66; }
+  #combo-hint { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); font-size: 15px; color: #ffcc00; pointer-events: none; transition: opacity 0.3s; text-align: center; }
+  #miss-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.15); pointer-events: none; opacity: 0; }
+  .heart { color: #ff4466; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="hud">
+    <span>SCORE: <span id="score">0</span></span>
+    <span>WAVE: <span id="wave">1</span></span>
+    <span>LIVES: <span id="lives">♥ ♥ ♥</span></span>
+  </div>
+  <div id="combo-hint"></div>
+  <div id="miss-flash"></div>
+</div>
+<div id="overlay">
+  <h1>SHORTCUT INVADERS</h1>
+  <p>Alien ships are Excel shortcuts.<br>Type the correct key combo to destroy them!</p>
+  <p class="big">HOW TO PLAY</p>
+  <p>Enemies show their shortcut name.<br>Press the matching keys to blast them.<br>Wrong combo = miss (-10pts). Let them land = lose a life.</p>
+  <p style="margin-top:12px; color:#888; font-size:12px;">Ctrl, Shift, Alt + key combinations supported</p>
+  <button id="startBtn">LAUNCH GAME</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const waveEl = document.getElementById('wave');
+const livesEl = document.getElementById('lives');
+const overlay = document.getElementById('overlay');
+const comboHint = document.getElementById('combo-hint');
+const missFlash = document.getElementById('miss-flash');
+
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+const SHORTCUTS = [
+  { name: 'Copy',          keys: ['ctrl','c'],          display: 'Ctrl+C' },
+  { name: 'Paste',         keys: ['ctrl','v'],          display: 'Ctrl+V' },
+  { name: 'Cut',           keys: ['ctrl','x'],          display: 'Ctrl+X' },
+  { name: 'Undo',          keys: ['ctrl','z'],          display: 'Ctrl+Z' },
+  { name: 'Redo',          keys: ['ctrl','y'],          display: 'Ctrl+Y' },
+  { name: 'Save',          keys: ['ctrl','s'],          display: 'Ctrl+S' },
+  { name: 'Select All',    keys: ['ctrl','a'],          display: 'Ctrl+A' },
+  { name: 'Find',          keys: ['ctrl','f'],          display: 'Ctrl+F' },
+  { name: 'Bold',          keys: ['ctrl','b'],          display: 'Ctrl+B' },
+  { name: 'Italic',        keys: ['ctrl','i'],          display: 'Ctrl+I' },
+  { name: 'New Sheet',     keys: ['shift','f11'],       display: 'Shift+F11' },
+  { name: 'AutoSum',       keys: ['alt','='],           display: 'Alt+=' },
+  { name: 'Fill Down',     keys: ['ctrl','d'],          display: 'Ctrl+D' },
+  { name: 'Fill Right',    keys: ['ctrl','r'],          display: 'Ctrl+R' },
+  { name: 'Format Cell',   keys: ['ctrl','1'],          display: 'Ctrl+1' },
+  { name: 'Close',         keys: ['ctrl','w'],          display: 'Ctrl+W' },
+  { name: 'Print',         keys: ['ctrl','p'],          display: 'Ctrl+P' },
+  { name: 'Open',          keys: ['ctrl','o'],          display: 'Ctrl+O' },
+  { name: 'Hyperlink',     keys: ['ctrl','k'],          display: 'Ctrl+K' },
+  { name: 'Go To',         keys: ['ctrl','g'],          display: 'Ctrl+G' },
+  { name: 'Paste Special', keys: ['ctrl','alt','v'],    display: 'Ctrl+Alt+V' },
+  { name: 'Filter',        keys: ['ctrl','shift','l'],  display: 'Ctrl+Shift+L' },
+  { name: 'Flash Fill',    keys: ['ctrl','e'],          display: 'Ctrl+E' },
+  { name: 'Name Box',      keys: ['ctrl','shift','f3'], display: 'Ctrl+Shift+F3' },
+];
+
+const WAVE_CONFIG = [
+  { pool: SHORTCUTS.slice(0,8),  count: 4, speed: 0.30 },
+  { pool: SHORTCUTS.slice(0,8),  count: 5, speed: 0.42 },
+  { pool: SHORTCUTS.slice(0,12), count: 6, speed: 0.55 },
+  { pool: SHORTCUTS.slice(0,16), count: 6, speed: 0.68 },
+  { pool: SHORTCUTS.slice(0,20), count: 7, speed: 0.82 },
+  { pool: SHORTCUTS,             count: 8, speed: 1.00 },
+];
+
+let state = 'idle', score = 0, lives = 3, waveNum = 0;
+let enemies = [], explosions = [], stars = [], lasers = [];
+let playerX, keysDown = {}, hintTimer = null;
+let spawnQueue = [], spawnTimer = 0;
+const SPAWN_INTERVAL = 1200;
+
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 80; i++)
+    stars.push({ x: Math.random()*2000, y: Math.random()*900, r: Math.random()*1.2+0.3, twinkle: Math.random()*Math.PI*2 });
+}
+initStars();
+
+function spawnWave() {
+  enemies = []; spawnQueue = []; spawnTimer = 0;
+  const cfg = WAVE_CONFIG[Math.min(waveNum, WAVE_CONFIG.length-1)];
+  for (let i = 0; i < cfg.count; i++) {
+    const sc = cfg.pool[Math.floor(Math.random()*cfg.pool.length)];
+    const patterns = ['sine','zigzag','swoop','straight','spiral'];
+    const pattern = waveNum < 2 ? 'straight' : patterns[Math.floor(Math.random()*patterns.length)];
+    spawnQueue.push({ sc, speed: cfg.speed + Math.random()*0.1, pattern });
+  }
+}
+
+function tickSpawn(dt) {
+  if (!spawnQueue.length) return;
+  spawnTimer -= dt;
+  if (spawnTimer > 0) return;
+  spawnTimer = SPAWN_INTERVAL;
+  const item = spawnQueue.shift();
+  const startX = 80 + Math.random()*(W-160);
+  enemies.push({ x: startX, y: -20, sc: item.sc, speed: item.speed, hit: false, flash: 0, pattern: item.pattern, t: 0, originX: startX, dx: (Math.random()-0.5)*0.6 });
+}
+
+function startGame() {
+  overlay.style.display = 'none';
+  state = 'playing';
+  score = 0; lives = 3; waveNum = 0;
+  enemies = []; explosions = []; lasers = [];
+  playerX = W/2;
+  updateHUD();
+  spawnWave();
+}
+
+function updateHUD() {
+  scoreEl.textContent = score;
+  waveEl.textContent = waveNum + 1;
+  livesEl.innerHTML = [0,1,2].map(i => i < lives ? `<span class="heart">♥</span>` : `<span style="opacity:0.2">♥</span>`).join(' ');
+}
+
+function showHint(text, color='#ffcc00') {
+  comboHint.textContent = text;
+  comboHint.style.color = color;
+  comboHint.style.opacity = '1';
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { comboHint.style.opacity = '0'; }, 900);
+}
+
+function flashMiss() {
+  missFlash.style.opacity = '1';
+  setTimeout(() => { missFlash.style.opacity = '0'; }, 150);
+}
+
+function addExplosion(x, y) {
+  for (let i = 0; i < 16; i++) {
+    const angle = (Math.PI*2/16)*i + Math.random()*0.3;
+    const spd = 1.5 + Math.random()*3;
+    explosions.push({ x, y, vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd, life: 1, color: ['#00ff88','#ffcc00','#ff4466','#00ccff','#ffffff'][Math.floor(Math.random()*5)] });
+  }
+}
+
+function fireLaser(tx, ty) {
+  lasers.push({ x: playerX, y: H-50, tx, ty, life: 1 });
+}
+
+function normalizeKey(e) {
+  let k = e.key.toLowerCase();
+  if (k === 'control') k = 'ctrl';
+  if (k === ' ') k = 'space';
+  return k;
+}
+
+function getCurrentCombo() {
+  const parts = [];
+  if (keysDown['ctrl']) parts.push('ctrl');
+  if (keysDown['alt']) parts.push('alt');
+  if (keysDown['shift']) parts.push('shift');
+  const ignored = new Set(['ctrl','alt','shift','meta','os','contextmenu']);
+  for (const k of Object.keys(keysDown))
+    if (keysDown[k] && !ignored.has(k)) parts.push(k);
+  return parts;
+}
+
+function comboMatches(combo, sc) {
+  return sc.keys.slice().sort().join(',') === combo.slice().sort().join(',');
+}
+
+function tryShoot(combo) {
+  if (combo.length < 2) return;
+  let hit = false;
+  for (const e of enemies) {
+    if (!e.hit && comboMatches(combo, e.sc)) {
+      e.hit = true;
+      fireLaser(e.x, e.y);
+      setTimeout(() => { addExplosion(e.x, e.y); score += 100*(waveNum+1); updateHUD(); }, 120);
+      showHint('DESTROYED! +' + (100*(waveNum+1)), '#00ff88');
+      hit = true; break;
+    }
+  }
+  if (!hit) {
+    score = Math.max(0, score - 10);
+    updateHUD();
+    showHint('MISS! -10', '#ff4466');
+    flashMiss();
+    fireLaser(playerX + (Math.random()-0.5)*200, -30);
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if (state !== 'playing') return;
+  const k = normalizeKey(e);
+  if (['ctrl','alt','shift'].includes(k)) { keysDown[k] = true; return; }
+  if (k === 'f5' || k === 'f12') return;
+  e.preventDefault();
+  keysDown[k] = true;
+  const combo = getCurrentCombo();
+  if (combo.length >= 2) tryShoot(combo);
+});
+window.addEventListener('keyup', e => { delete keysDown[normalizeKey(e)]; });
+
+function drawPlayerShip(x, y) {
+  ctx.save(); ctx.translate(x, y);
+  const glowR = 18 + Math.sin(Date.now()*0.008)*4;
+  const grd = ctx.createRadialGradient(0,14,2,0,14,glowR);
+  grd.addColorStop(0,'rgba(0,180,255,0.6)'); grd.addColorStop(1,'rgba(0,80,255,0)');
+  ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(0,14,glowR,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#00ccff';
+  ctx.beginPath(); ctx.moveTo(-5,10); ctx.lineTo(5,10);
+  ctx.lineTo(3,22+Math.sin(Date.now()*0.015)*4); ctx.lineTo(0,18);
+  ctx.lineTo(-3,22+Math.sin(Date.now()*0.015)*4); ctx.closePath(); ctx.fill();
+  const bg = ctx.createLinearGradient(-14,-20,14,10);
+  bg.addColorStop(0,'#00ffcc'); bg.addColorStop(0.5,'#0088ff'); bg.addColorStop(1,'#004488');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(6,-10); ctx.lineTo(14,2); ctx.lineTo(10,10);
+  ctx.lineTo(5,8); ctx.lineTo(5,12); ctx.lineTo(-5,12); ctx.lineTo(-5,8);
+  ctx.lineTo(-10,10); ctx.lineTo(-14,2); ctx.lineTo(-6,-10); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#00ffff'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(-14,2); ctx.lineTo(-8,-6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(14,2); ctx.lineTo(8,-6); ctx.stroke();
+  const cg = ctx.createRadialGradient(-2,-12,1,0,-10,6);
+  cg.addColorStop(0,'#aaffff'); cg.addColorStop(1,'#005577');
+  ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0,-10,5,7,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(0,-22,2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#00ffaa'; ctx.fillRect(-16,4,4,8); ctx.fillRect(12,4,4,8);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(-14,3,2,3); ctx.fillRect(12,3,2,3);
+  ctx.restore();
+}
+
+function drawAlien(x, y, label, shortcut, flash) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.globalAlpha = flash > 0 ? 0.4 + Math.sin(flash*20)*0.6 : 1;
+  ctx.fillStyle = flash > 0 ? '#ff4466' : '#ff6600';
+  ctx.beginPath(); ctx.moveTo(0,-14);
+  ctx.bezierCurveTo(8,-14,18,-4,18,6); ctx.lineTo(12,14); ctx.lineTo(6,10);
+  ctx.lineTo(0,13); ctx.lineTo(-6,10); ctx.lineTo(-12,14);
+  ctx.bezierCurveTo(-18,-4,-8,-14,0,-14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = flash > 0 ? '#ff0000' : '#ffcc00';
+  ctx.beginPath(); ctx.arc(-6,0,4,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(6,0,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.arc(-6,0,2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(6,0,2,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#ff9900'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(-8,7); ctx.lineTo(-4,10); ctx.lineTo(0,8); ctx.lineTo(4,10); ctx.lineTo(8,7); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='bold 11px Courier New'; ctx.textAlign='center';
+  ctx.fillText(label, 0, 30);
+  if (waveNum < 10) { ctx.fillStyle='#ffcc00'; ctx.font='10px Courier New'; ctx.fillText(shortcut,0,44); }
+  ctx.restore();
+}
+
+let lastTime = 0;
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50); lastTime = ts;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a0a1a'; ctx.fillRect(0,0,W,H);
+  for (const s of stars) {
+    s.twinkle += 0.02;
+    ctx.fillStyle = `rgba(200,220,255,${0.4+Math.sin(s.twinkle)*0.3})`;
+    ctx.beginPath(); ctx.arc(s.x%W,s.y%H,s.r,0,Math.PI*2); ctx.fill();
+  }
+  if (state === 'playing' || state === 'between') {
+    tickSpawn(dt);
+    enemies = enemies.filter(e => {
+      e.t += dt*0.001; e.y += e.speed*(dt/16);
+      if (e.pattern==='sine') e.x = e.originX+Math.sin(e.t*3)*60;
+      else if (e.pattern==='zigzag') e.x = e.originX+(Math.sin(e.t*5)>0?1:-1)*50;
+      else if (e.pattern==='swoop') e.x = e.originX+Math.sin(e.t*1.5)*120;
+      else if (e.pattern==='spiral') e.x = e.originX+Math.sin(e.t*4)*(20+e.t*30);
+      else { e.x += e.dx*(dt/16); if(e.x<30)e.dx=Math.abs(e.dx); if(e.x>W-30)e.dx=-Math.abs(e.dx); }
+      e.x = Math.max(30, Math.min(W-30, e.x));
+      if (!e.hit && e.y > H-80) {
+        lives--; updateHUD(); addExplosion(e.x,e.y);
+        if (lives<=0) { state='over'; setTimeout(gameOver,400); }
+        return false;
+      }
+      if (e.flash>0) e.flash -= dt/200;
+      return !e.hit;
+    });
+    for (const e of enemies) drawAlien(e.x, e.y, e.sc.name, e.sc.display, e.flash);
+    for (const l of lasers) {
+      ctx.save();
+      ctx.globalAlpha=l.life*0.3; ctx.strokeStyle='#00ffff'; ctx.lineWidth=8;
+      ctx.shadowColor='#00ffff'; ctx.shadowBlur=16;
+      ctx.beginPath(); ctx.moveTo(l.x,l.y); ctx.lineTo(l.tx,l.ty); ctx.stroke();
+      ctx.globalAlpha=l.life; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(l.x,l.y); ctx.lineTo(l.tx,l.ty); ctx.stroke();
+      ctx.restore();
+    }
+    lasers = lasers.filter(l => { l.life -= dt/200; return l.life>0; });
+    drawPlayerShip(playerX, H-52);
+    ctx.strokeStyle='rgba(0,255,136,0.15)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,H-70); ctx.lineTo(W,H-70); ctx.stroke();
+    if (state==='playing' && enemies.length===0 && spawnQueue.length===0) {
+      state='between'; waveNum++; updateHUD();
+      showHint('WAVE '+(waveNum+1)+'!','#00ccff');
+      setTimeout(()=>{ state='playing'; spawnWave(); }, 800);
+    }
+  }
+  for (let i=explosions.length-1;i>=0;i--) {
+    const p=explosions[i]; p.x+=p.vx; p.y+=p.vy; p.life-=0.04;
+    if(p.life<=0){explosions.splice(i,1);continue;}
+    ctx.globalAlpha=p.life; ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function gameOver() {
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `
+    <h1 style="color:#ff4466">GAME OVER</h1>
+    <p class="big">FINAL SCORE: ${score.toLocaleString()}</p>
+    <p>You reached Wave ${waveNum + 1}</p>
+    <p style="margin-top:14px; color:#888; font-size:12px;">Keep practicing those shortcuts!</p>
+    <button id="startBtn">PLAY AGAIN</button>
+  `;
+  document.getElementById('startBtn').addEventListener('click', startGame);
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+</script>
+</body>
+</html>

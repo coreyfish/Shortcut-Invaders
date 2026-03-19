@@ -454,38 +454,47 @@ async function gameOver(){
     <h1 style="color:#ff4466">GAME OVER</h1>
     <p class="big">FINAL SCORE: ${finalScore.toLocaleString()}</p>
     <p>You reached Wave ${finalWave}</p>
-    <p style="margin-top:10px;color:#aaa;font-size:13px;">Enter your details for the leaderboard:</p>
-    <input class="game-input" id="nameInput" type="text" placeholder="USERNAME" maxlength="20" autocomplete="off"/>
-    ${buildCountrySelect()}
-    <div class="err" id="nameErr"></div>
-    <button id="submitBtn">SUBMIT SCORE</button>
-    <button class="sec" id="skipBtn">SKIP</button>
     ${!configured?`<div class="config-notice">⚠️ Add your JSONBin credentials to enable the leaderboard.</div>`:''}
-    <div class="lb" id="lbPanel"><div class="lb-loading">Loading leaderboard...</div></div>`;
+    <div class="lb" id="lbPanel"><div class="lb-loading">Loading leaderboard...</div></div>
+    <button class="sec" id="skipBtn" style="margin-top:16px">PLAY AGAIN</button>`;
   document.getElementById('skipBtn').addEventListener('click',()=>location.reload());
-  const entries=await fetchScores();
-  document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(entries.slice(0,LEADERBOARD_MAX),'',-1);
 
-  async function doSubmit(){
-    const nameInput=document.getElementById('nameInput'),errEl=document.getElementById('nameErr'),submitBtn=document.getElementById('submitBtn');
-    const countrySelect=document.getElementById('countrySelect');
-    const name=(nameInput?.value||'').trim();
-    const isoVal=countrySelect?.value||'';
-    const countryObj=COUNTRIES.find(c=>c.iso===isoVal);
-    if(!name){errEl.textContent='Please enter a username.';return;}
-    if(name.length<2){errEl.textContent='Name must be at least 2 characters.';return;}
-    submitBtn.textContent='Checking...'; submitBtn.disabled=true; errEl.textContent='';
-    const clean=await isNameClean(name);
-    if(!clean){errEl.textContent='That name is not allowed. Please choose another.';submitBtn.textContent='SUBMIT SCORE';submitBtn.disabled=false;nameInput.value='';nameInput.focus();return;}
-    submitBtn.textContent='Saving...';
-    const updated=await addScore(name,countryObj?.iso||'',countryObj?.flag||'',finalScore,finalWave);
-    document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(updated,name,finalScore);
-    submitBtn.style.display='none'; document.getElementById('skipBtn').textContent='PLAY AGAIN';
-    document.getElementById('nameInput').style.display='none'; document.getElementById('countrySelect').style.display='none';
-    document.getElementById('nameErr').style.display='none';
+  const entries=await fetchScores();
+  const top=entries.slice(0,LEADERBOARD_MAX);
+  const qualifies=!configured?false:(top.length<LEADERBOARD_MAX||finalScore>=(top[top.length-1]?.score||0));
+
+  if(qualifies){
+    document.getElementById('lbPanel').insertAdjacentHTML('beforebegin',`
+      <p style="margin-top:10px;color:#ffcc00;font-size:13px;">🏆 You made the top ${LEADERBOARD_MAX}! Enter your details:</p>
+      <input class="game-input" id="nameInput" type="text" placeholder="USERNAME" maxlength="20" autocomplete="off"/>
+      ${buildCountrySelect()}
+      <div class="err" id="nameErr"></div>
+      <button id="submitBtn">SUBMIT SCORE</button>`);
+
+    async function doSubmit(){
+      const nameInput=document.getElementById('nameInput'),errEl=document.getElementById('nameErr'),submitBtn=document.getElementById('submitBtn');
+      const countrySelect=document.getElementById('countrySelect');
+      const name=(nameInput?.value||'').trim();
+      const isoVal=countrySelect?.value||'';
+      const countryObj=COUNTRIES.find(c=>c.iso===isoVal);
+      if(!name){errEl.textContent='Please enter a username.';return;}
+      if(name.length<2){errEl.textContent='Name must be at least 2 characters.';return;}
+      submitBtn.textContent='Checking...'; submitBtn.disabled=true; errEl.textContent='';
+      const clean=await isNameClean(name);
+      if(!clean){errEl.textContent='That name is not allowed. Please choose another.';submitBtn.textContent='SUBMIT SCORE';submitBtn.disabled=false;nameInput.value='';nameInput.focus();return;}
+      submitBtn.textContent='Saving...';
+      const updated=await addScore(name,countryObj?.iso||'',countryObj?.flag||'',finalScore,finalWave);
+      document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(updated,name,finalScore);
+      submitBtn.style.display='none';
+      document.getElementById('nameInput').style.display='none';
+      document.getElementById('countrySelect').style.display='none';
+      document.getElementById('nameErr').style.display='none';
+    }
+    document.getElementById('submitBtn').addEventListener('click',doSubmit);
+    document.getElementById('nameInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSubmit();});
   }
-  document.getElementById('submitBtn').addEventListener('click',doSubmit);
-  document.getElementById('nameInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSubmit();});
+
+  document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(top,'',-1);
 }
 
 async function showStartLB(){

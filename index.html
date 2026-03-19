@@ -48,6 +48,7 @@
 <div id="ui">
   <div id="hud">
     <span>SCORE: <span id="score">0</span></span>
+    <span id="multiplier" style="color:#ffcc00;min-width:80px;text-align:center;"></span>
     <span>WAVE: <span id="wave">1</span></span>
     <span>LIVES: <span id="lives">&#9829; &#9829; &#9829;</span></span>
   </div>
@@ -414,13 +415,15 @@ function tickSpawn(dt) {
   var item = spawnQueue.shift();
   var startX = 80 + Math.random() * (W - 160);
   var hp = item.isBoss ? bossHp(waveNum) : 1;
-  enemies.push({ x:startX, y:-20, sc:item.sc, speed:item.speed, hit:false, flash:0, pattern:item.pattern, t:0, originX:startX, dx:(Math.random()-0.5)*0.6, hintVisible:waveNum<2, bobOffset:Math.random()*Math.PI*2, isBoss:item.isBoss, hp:hp, maxHp:hp });
+  var bossQueue = item.isBoss ? randomBossQueue(hp) : null;
+  enemies.push({ x:startX, y:-20, sc:item.isBoss ? bossQueue[0] : item.sc, speed:item.speed, hit:false, flash:0, pattern:item.pattern, t:0, originX:startX, dx:(Math.random()-0.5)*0.6, hintVisible:waveNum<2, bobOffset:Math.random()*Math.PI*2, isBoss:item.isBoss, hp:hp, maxHp:hp, bossQueue:bossQueue, bossQueueIdx:0 });
 }
 
 function startGame() {
   overlay.style.display = 'none';
   state = 'playing'; score = 0; lives = 3; waveNum = 0;
   enemies = []; explosions = []; lasers = [];
+  streak = 0; multiplier = 1;
   playerX = W / 2; updateHUD(); spawnWave();
 }
 
@@ -485,27 +488,34 @@ function tryShoot(combo) {
     var e = enemies[i];
     if (!e.hit && comboMatches(combo, e.sc)) {
       fireLaser(e.x, e.y);
+      streak++;
+      updateMultiplier();
       if (e.isBoss) {
         e.hp--; e.flash = 1;
         if (e.hp <= 0) {
           e.hit = true;
-          (function(ex,ey){ setTimeout(function(){ addExplosion(ex,ey,true); score+=500*(waveNum+1); updateHUD(); },120); })(e.x,e.y);
-          showHint(T.bossDown + ' +' + (500*(waveNum+1)), '#ff44ff');
+          (function(ex,ey){ setTimeout(function(){ addExplosion(ex,ey,true); score+=500*(waveNum+1)*multiplier; updateHUD(); },120); })(e.x,e.y);
+          showHint(T.bossDown + ' +' + (500*(waveNum+1)*multiplier), '#ff44ff');
         } else {
-          score += 150*(waveNum+1); updateHUD();
-          showHint(T.bossHit + ' +' + (150*(waveNum+1)) + '  HP: ' + e.hp, '#ff9900');
+          // advance to next random shortcut in queue
+          e.bossQueueIdx++;
+          e.sc = e.bossQueue[e.bossQueueIdx];
+          e.hintVisible = waveNum < 2;
+          score += 150*(waveNum+1)*multiplier; updateHUD();
+          showHint(T.bossHit + ' +' + (150*(waveNum+1)*multiplier) + '  HP: ' + e.hp, '#ff9900');
         }
       } else {
         e.hit = true;
-        (function(ex,ey){ setTimeout(function(){ addExplosion(ex,ey,false); score+=100*(waveNum+1); updateHUD(); },120); })(e.x,e.y);
-        showHint(T.destroyed + ' +' + (100*(waveNum+1)), '#00ff88');
+        (function(ex,ey){ setTimeout(function(){ addExplosion(ex,ey,false); score+=100*(waveNum+1)*multiplier; updateHUD(); },120); })(e.x,e.y);
+        showHint(T.destroyed + ' +' + (100*(waveNum+1)*multiplier) + (multiplier>1?' x'+multiplier:''), '#00ff88');
       }
       hit = true; break;
     }
   }
   if (!hit) {
+    resetStreak();
     score = Math.max(0, score-10); updateHUD();
-    showHint(T.miss + ' -10', '#ff4466');
+    showHint(T.miss + ' -10  COMBO RESET', '#ff4466');
     flashMissEffect();
     fireLaser(playerX+(Math.random()-0.5)*200, -30);
   }
@@ -591,6 +601,19 @@ function drawAlien(e) {
   ctx.fillStyle='#ffffff'; ctx.font='bold '+(e.isBoss?13:11)+'px Courier New'; ctx.textAlign='center';
   ctx.fillText(e.sc.name, 0, e.isBoss?46:38);
   if (waveNum < 10 && e.hintVisible) { ctx.fillStyle='#ffcc00'; ctx.font=(e.isBoss?11:10)+'px Courier New'; ctx.fillText(e.sc.display,0,e.isBoss?62:52); }
+  // boss queue display
+  if (e.isBoss && e.bossQueue) {
+    var qy = 80;
+    for (var qi = e.bossQueueIdx + 1; qi < e.bossQueue.length; qi++) {
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#ffaa44';
+      ctx.font = '9px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.bossQueue[qi].name, 0, qy);
+      qy += 13;
+    }
+    ctx.globalAlpha = 1;
+  }
   if (e.isBoss) {
     var bw=60,bh=6,bx=-30,by=68;
     ctx.fillStyle='#330000'; ctx.fillRect(bx,by,bw,bh);
@@ -675,6 +698,39 @@ function drawWaveAnim(dt) {
   }
 
   ctx.restore();
+}
+
+var streak = 0, multiplier = 1;
+var multiplierEl = null;
+
+function updateMultiplier() {
+  if (streak >= 8) multiplier = 4;
+  else if (streak >= 5) multiplier = 3;
+  else if (streak >= 3) multiplier = 2;
+  else multiplier = 1;
+  var el = document.getElementById('multiplier');
+  if (el) {
+    el.textContent = multiplier > 1 ? 'x' + multiplier + ' COMBO' : '';
+    el.style.color = multiplier >= 4 ? '#ff44ff' : multiplier >= 3 ? '#ff9900' : '#ffcc00';
+  }
+}
+
+function resetStreak() {
+  streak = 0; multiplier = 1;
+  var el = document.getElementById('multiplier');
+  if (el) el.textContent = '';
+}
+
+function randomBossQueue(hp) {
+  var pool = SHORTCUTS.slice();
+  var queue = [];
+  for (var i = 0; i < hp; i++) {
+    var idx = Math.floor(Math.random() * pool.length);
+    queue.push(pool[idx]);
+    pool.splice(idx, 1);
+    if (pool.length === 0) pool = SHORTCUTS.slice();
+  }
+  return queue;
 }
 
 var lastTime = 0;

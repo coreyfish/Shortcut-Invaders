@@ -33,6 +33,10 @@
   input.game-input::placeholder { color: rgba(0,255,136,0.35); }
   select.game-select { background: #0a0a1a; border: 1px solid #00ff88; color: #00ff88; font-family: 'Courier New', monospace; font-size: 13px; padding: 6px 10px; width: 240px; margin: 6px 0 4px; outline: none; cursor: pointer; }
   select.game-select option { background: #0a0a1a; color: #00ff88; }
+  .lang-btns { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; justify-content: center; }
+  .lang-btn { background: transparent; border: 1px solid rgba(0,255,136,0.4); color: #aaa; font-family: 'Courier New', monospace; font-size: 12px; padding: 5px 12px; cursor: pointer; letter-spacing: 1px; margin-top: 0; }
+  .lang-btn:hover { border-color: #00ff88; color: #00ff88; }
+  .lang-btn.active { background: rgba(0,255,136,0.15); border-color: #00ff88; color: #00ff88; }
   .err { color: #ff4466; font-size: 12px; margin-top: 4px; min-height: 16px; text-align: center; }
   .lb-loading { font-size: 12px; color: #555; text-align: center; padding: 10px; }
   .config-notice { font-size: 11px; color: #ff9900; background: rgba(255,153,0,0.1); border: 1px solid rgba(255,153,0,0.3); padding: 8px 12px; margin-top: 10px; max-width: 380px; text-align: center; line-height: 1.5; }
@@ -51,10 +55,18 @@
 </div>
 <div id="overlay">
   <h1>SHORTCUT INVADERS</h1>
-  <p>Alien ships are Excel shortcuts.<br>Type the correct key combo to destroy them!</p>
-  <p class="big">HOW TO PLAY</p>
-  <p>Enemies show their shortcut name.<br>Press the matching keys to blast them.<br>Wrong combo = miss (-10pts). Let them land = lose a life.</p>
-  <p style="margin-top:8px;color:#ff9900;font-size:12px;">Boss ships appear from wave 7 — they take multiple hits!</p>
+  <p id="tagline">Alien ships are Excel shortcuts.<br>Type the correct key combo to destroy them!</p>
+  <p class="big" id="howLabel">HOW TO PLAY</p>
+  <p id="howText">Enemies show their shortcut name.<br>Press the matching keys to blast them.<br>Wrong combo = miss (-10pts). Let them land = lose a life.</p>
+  <p style="margin-top:8px;color:#ff9900;font-size:12px;" id="bossNote">Boss ships appear from wave 7 — they take multiple hits!</p>
+  <p style="margin-top:8px;color:#aaa;font-size:12px;" id="langLabel">SELECT LANGUAGE</p>
+  <div class="lang-btns">
+    <button class="lang-btn active" data-lang="en">🇬🇧 EN</button>
+    <button class="lang-btn" data-lang="fr">🇫🇷 FR</button>
+    <button class="lang-btn" data-lang="de">🇩🇪 DE</button>
+    <button class="lang-btn" data-lang="es">🇪🇸 ES</button>
+    <button class="lang-btn" data-lang="pt">🇵🇹 PT</button>
+  </div>
   <button id="startBtn">LAUNCH GAME</button>
   <div class="lb" id="startLb"><div class="lb-loading">Loading leaderboard...</div></div>
 </div>
@@ -64,6 +76,202 @@ const JSONBIN_BIN_ID  = '69bb5cfcaa77b81da9f9b4d7';
 const JSONBIN_API_KEY = '$2a$10$akBDEIiJSQ3ze5g.5PiRPOFL3dYlAYqS/clngshIYYEpQdV2R4Jz6';
 const LEADERBOARD_MAX = 10;
 const BOSS_START_WAVE = 6;
+
+// ─── LANGUAGE PACKS ───────────────────────────────────────────────
+// Each shortcut: { name, keys, display }
+// keys must match exactly what the browser reports via e.key.toLowerCase()
+const LANG_SHORTCUTS = {
+  en: [
+    { name:'Copy',         keys:['ctrl','c'],          display:'Ctrl+C' },
+    { name:'Paste',        keys:['ctrl','v'],          display:'Ctrl+V' },
+    { name:'Cut',          keys:['ctrl','x'],          display:'Ctrl+X' },
+    { name:'Undo',         keys:['ctrl','z'],          display:'Ctrl+Z' },
+    { name:'Redo',         keys:['ctrl','y'],          display:'Ctrl+Y' },
+    { name:'Save',         keys:['ctrl','s'],          display:'Ctrl+S' },
+    { name:'Select All',   keys:['ctrl','a'],          display:'Ctrl+A' },
+    { name:'Find',         keys:['ctrl','f'],          display:'Ctrl+F' },
+    { name:'Bold',         keys:['ctrl','b'],          display:'Ctrl+B' },
+    { name:'Italic',       keys:['ctrl','i'],          display:'Ctrl+I' },
+    { name:'New Sheet',    keys:['shift','f11'],       display:'Shift+F11' },
+    { name:'AutoSum',      keys:['alt','='],           display:'Alt+=' },
+    { name:'Fill Down',    keys:['ctrl','d'],          display:'Ctrl+D' },
+    { name:'Fill Right',   keys:['ctrl','r'],          display:'Ctrl+R' },
+    { name:'Format Cell',  keys:['ctrl','1'],          display:'Ctrl+1' },
+    { name:'Print',        keys:['ctrl','p'],          display:'Ctrl+P' },
+    { name:'Open',         keys:['ctrl','o'],          display:'Ctrl+O' },
+    { name:'Hyperlink',    keys:['ctrl','k'],          display:'Ctrl+K' },
+    { name:'Go To',        keys:['ctrl','g'],          display:'Ctrl+G' },
+    { name:'Paste Special',keys:['ctrl','alt','v'],    display:'Ctrl+Alt+V' },
+    { name:'Flash Fill',   keys:['ctrl','e'],          display:'Ctrl+E' },
+    { name:'Name Box',     keys:['ctrl','shift','f3'], display:'Ctrl+Shift+F3' },
+    { name:'Freeze Panes', keys:['alt','w'],           display:'Alt+W' },
+    { name:'Insert Row',   keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
+    { name:'Delete Row',   keys:['ctrl','-'],          display:'Ctrl+-' },
+    { name:'Hide Row',     keys:['ctrl','9'],          display:'Ctrl+9' },
+    { name:'Hide Column',  keys:['ctrl','0'],          display:'Ctrl+0' },
+    { name:'Trace Prev',   keys:['ctrl','['],          display:'Ctrl+[' },
+    { name:'Absolute Ref', keys:['f4'],                display:'F4' },
+    { name:'Calc Now',     keys:['f9'],                display:'F9' },
+    { name:'Insert Fn',    keys:['shift','f3'],        display:'Shift+F3' },
+    { name:'Format $',     keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
+    { name:'Format %',     keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
+  ],
+  fr: [
+    { name:'Copier',       keys:['ctrl','c'],          display:'Ctrl+C' },
+    { name:'Coller',       keys:['ctrl','v'],          display:'Ctrl+V' },
+    { name:'Couper',       keys:['ctrl','x'],          display:'Ctrl+X' },
+    { name:'Annuler',      keys:['ctrl','z'],          display:'Ctrl+Z' },
+    // French Excel: Ctrl+Y = Répéter (Redo)
+    { name:'Répéter',      keys:['ctrl','y'],          display:'Ctrl+Y' },
+    { name:'Enregistrer',  keys:['ctrl','s'],          display:'Ctrl+S' },
+    { name:'Tout sélect.', keys:['ctrl','a'],          display:'Ctrl+A' },
+    { name:'Rechercher',   keys:['ctrl','f'],          display:'Ctrl+F' },
+    { name:'Gras',         keys:['ctrl','b'],          display:'Ctrl+B' },
+    { name:'Italique',     keys:['ctrl','i'],          display:'Ctrl+I' },
+    { name:'Nouv. feuille',keys:['shift','f11'],       display:'Shift+F11' },
+    { name:'Somme auto',   keys:['alt','='],           display:'Alt+=' },
+    { name:'Recopier bas', keys:['ctrl','d'],          display:'Ctrl+D' },
+    { name:'Recopier droite',keys:['ctrl','r'],        display:'Ctrl+R' },
+    { name:'Format cellule',keys:['ctrl','1'],         display:'Ctrl+1' },
+    { name:'Imprimer',     keys:['ctrl','p'],          display:'Ctrl+P' },
+    { name:'Ouvrir',       keys:['ctrl','o'],          display:'Ctrl+O' },
+    { name:'Lien hypertexte',keys:['ctrl','k'],        display:'Ctrl+K' },
+    { name:'Atteindre',    keys:['ctrl','g'],          display:'Ctrl+G' },
+    { name:'Collage spécial',keys:['ctrl','alt','v'],  display:'Ctrl+Alt+V' },
+    { name:'Remp. instantané',keys:['ctrl','e'],       display:'Ctrl+E' },
+    { name:'Réf. absolue', keys:['f4'],                display:'F4' },
+    { name:'Calculer',     keys:['f9'],                display:'F9' },
+    { name:'Insérer fn',   keys:['shift','f3'],        display:'Shift+F3' },
+    { name:'Format €',     keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
+    { name:'Format %',     keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
+    { name:'Insérer ligne',keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
+    { name:'Suppr. ligne', keys:['ctrl','-'],          display:'Ctrl+-' },
+    { name:'Masquer ligne',keys:['ctrl','9'],          display:'Ctrl+9' },
+    { name:'Masquer col.', keys:['ctrl','0'],          display:'Ctrl+0' },
+  ],
+  de: [
+    { name:'Kopieren',     keys:['ctrl','c'],          display:'Strg+C' },
+    { name:'Einfügen',     keys:['ctrl','v'],          display:'Strg+V' },
+    { name:'Ausschneiden', keys:['ctrl','x'],          display:'Strg+X' },
+    { name:'Rückgängig',   keys:['ctrl','z'],          display:'Strg+Z' },
+    { name:'Wiederholen',  keys:['ctrl','y'],          display:'Strg+Y' },
+    { name:'Speichern',    keys:['ctrl','s'],          display:'Strg+S' },
+    { name:'Alles wählen', keys:['ctrl','a'],          display:'Strg+A' },
+    { name:'Suchen',       keys:['ctrl','f'],          display:'Strg+F' },
+    { name:'Fett',         keys:['ctrl','b'],          display:'Strg+F' },
+    { name:'Kursiv',       keys:['ctrl','i'],          display:'Strg+K' },
+    { name:'Neues Blatt',  keys:['shift','f11'],       display:'Shift+F11' },
+    { name:'AutoSumme',    keys:['alt','='],           display:'Alt+=' },
+    { name:'Ausfüllen ↓',  keys:['ctrl','d'],          display:'Strg+U' },
+    { name:'Ausfüllen →',  keys:['ctrl','r'],          display:'Strg+R' },
+    { name:'Zellen form.', keys:['ctrl','1'],          display:'Strg+1' },
+    { name:'Drucken',      keys:['ctrl','p'],          display:'Strg+P' },
+    { name:'Öffnen',       keys:['ctrl','o'],          display:'Strg+O' },
+    { name:'Hyperlink',    keys:['ctrl','k'],          display:'Strg+K' },
+    { name:'Gehe zu',      keys:['ctrl','g'],          display:'Strg+G' },
+    { name:'Inhalte einf.',keys:['ctrl','alt','v'],    display:'Strg+Alt+V' },
+    { name:'Blitzvorschau',keys:['ctrl','e'],          display:'Strg+E' },
+    { name:'Abs. Bezug',   keys:['f4'],                display:'F4' },
+    { name:'Berechnen',    keys:['f9'],                display:'F9' },
+    { name:'Funktion einf.',keys:['shift','f3'],       display:'Shift+F3' },
+    { name:'Format €',     keys:['ctrl','shift','4'],  display:'Strg+Shift+$' },
+    { name:'Format %',     keys:['ctrl','shift','5'],  display:'Strg+Shift+%' },
+    { name:'Zeile einfügen',keys:['ctrl','shift','+'], display:'Strg+Shift++' },
+    { name:'Zeile löschen',keys:['ctrl','-'],          display:'Strg+-' },
+    { name:'Zeile ausbl.', keys:['ctrl','9'],          display:'Strg+9' },
+    { name:'Spalte ausbl.',keys:['ctrl','0'],          display:'Strg+0' },
+  ],
+  es: [
+    { name:'Copiar',       keys:['ctrl','c'],          display:'Ctrl+C' },
+    { name:'Pegar',        keys:['ctrl','v'],          display:'Ctrl+V' },
+    { name:'Cortar',       keys:['ctrl','x'],          display:'Ctrl+X' },
+    { name:'Deshacer',     keys:['ctrl','z'],          display:'Ctrl+Z' },
+    { name:'Rehacer',      keys:['ctrl','y'],          display:'Ctrl+Y' },
+    { name:'Guardar',      keys:['ctrl','s'],          display:'Ctrl+S' },
+    { name:'Selec. todo',  keys:['ctrl','a'],          display:'Ctrl+A' },
+    { name:'Buscar',       keys:['ctrl','b'],          display:'Ctrl+B' },
+    { name:'Negrita',      keys:['ctrl','n'],          display:'Ctrl+N' },
+    { name:'Cursiva',      keys:['ctrl','k'],          display:'Ctrl+K' },
+    { name:'Nueva hoja',   keys:['shift','f11'],       display:'Shift+F11' },
+    { name:'Autosuma',     keys:['alt','='],           display:'Alt+=' },
+    { name:'Rellenar ↓',   keys:['ctrl','d'],          display:'Ctrl+D' },
+    { name:'Rellenar →',   keys:['ctrl','r'],          display:'Ctrl+R' },
+    { name:'Formato celda',keys:['ctrl','1'],          display:'Ctrl+1' },
+    { name:'Imprimir',     keys:['ctrl','p'],          display:'Ctrl+P' },
+    { name:'Abrir',        keys:['ctrl','a'],          display:'Ctrl+A' },
+    { name:'Hipervínculo', keys:['ctrl','alt','k'],    display:'Ctrl+Alt+K' },
+    { name:'Ir a',         keys:['ctrl','i'],          display:'Ctrl+I' },
+    { name:'Peg. especial',keys:['ctrl','alt','v'],    display:'Ctrl+Alt+V' },
+    { name:'Relleno rápido',keys:['ctrl','e'],         display:'Ctrl+E' },
+    { name:'Ref. absoluta',keys:['f4'],                display:'F4' },
+    { name:'Calcular',     keys:['f9'],                display:'F9' },
+    { name:'Insertar fn',  keys:['shift','f3'],        display:'Shift+F3' },
+    { name:'Formato $',    keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
+    { name:'Formato %',    keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
+    { name:'Insertar fila',keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
+    { name:'Eliminar fila',keys:['ctrl','-'],          display:'Ctrl+-' },
+    { name:'Ocultar fila', keys:['ctrl','9'],          display:'Ctrl+9' },
+    { name:'Ocultar col.', keys:['ctrl','0'],          display:'Ctrl+0' },
+  ],
+  pt: [
+    { name:'Copiar',       keys:['ctrl','c'],          display:'Ctrl+C' },
+    { name:'Colar',        keys:['ctrl','v'],          display:'Ctrl+V' },
+    { name:'Recortar',     keys:['ctrl','x'],          display:'Ctrl+X' },
+    { name:'Desfazer',     keys:['ctrl','z'],          display:'Ctrl+Z' },
+    { name:'Refazer',      keys:['ctrl','y'],          display:'Ctrl+Y' },
+    { name:'Salvar',       keys:['ctrl','s'],          display:'Ctrl+S' },
+    { name:'Selec. tudo',  keys:['ctrl','t'],          display:'Ctrl+T' },
+    { name:'Localizar',    keys:['ctrl','l'],          display:'Ctrl+L' },
+    { name:'Negrito',      keys:['ctrl','n'],          display:'Ctrl+N' },
+    { name:'Itálico',      keys:['ctrl','i'],          display:'Ctrl+I' },
+    { name:'Nova planilha',keys:['shift','f11'],       display:'Shift+F11' },
+    { name:'AutoSoma',     keys:['alt','='],           display:'Alt+=' },
+    { name:'Preencher ↓',  keys:['ctrl','d'],          display:'Ctrl+D' },
+    { name:'Preencher →',  keys:['ctrl','r'],          display:'Ctrl+R' },
+    { name:'Formatar céls',keys:['ctrl','1'],          display:'Ctrl+1' },
+    { name:'Imprimir',     keys:['ctrl','p'],          display:'Ctrl+P' },
+    { name:'Abrir',        keys:['ctrl','a'],          display:'Ctrl+A' },
+    { name:'Hiperlink',    keys:['ctrl','k'],          display:'Ctrl+K' },
+    { name:'Ir para',      keys:['ctrl','g'],          display:'Ctrl+G' },
+    { name:'Col. especial',keys:['ctrl','alt','v'],    display:'Ctrl+Alt+V' },
+    { name:'Preench. rela.',keys:['ctrl','e'],         display:'Ctrl+E' },
+    { name:'Ref. absoluta',keys:['f4'],                display:'F4' },
+    { name:'Calcular',     keys:['f9'],                display:'F9' },
+    { name:'Inserir fn',   keys:['shift','f3'],        display:'Shift+F3' },
+    { name:'Formato R$',   keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
+    { name:'Formato %',    keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
+    { name:'Inserir linha',keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
+    { name:'Excluir linha',keys:['ctrl','-'],          display:'Ctrl+-' },
+    { name:'Ocultar linha',keys:['ctrl','9'],          display:'Ctrl+9' },
+    { name:'Ocultar col.', keys:['ctrl','0'],          display:'Ctrl+0' },
+  ],
+};
+
+const UI_TEXT = {
+  en: { tagline:'Alien ships are Excel shortcuts.<br>Type the correct key combo to destroy them!', howLabel:'HOW TO PLAY', howText:'Enemies show their shortcut name.<br>Press the matching keys to blast them.<br>Wrong combo = miss (-10pts). Let them land = lose a life.', bossNote:'Boss ships appear from wave 7 — they take multiple hits!', launch:'LAUNCH GAME', langLabel:'SELECT LANGUAGE', gameOver:'GAME OVER', finalScore:'FINAL SCORE', waveReached:'You reached Wave', topMsg:'🏆 You made the top', enterDetails:'Enter your details:', username:'USERNAME', submit:'SUBMIT SCORE', playAgain:'PLAY AGAIN', checking:'Checking...', saving:'Saving...', bossDown:'BOSS DOWN!', bossHit:'BOSS HIT!', bossEsc:'BOSS ESCAPED! -2 LIVES', destroyed:'DESTROYED!', miss:'MISS!', wave:'WAVE', bossIncoming:'— BOSS INCOMING!' },
+  fr: { tagline:'Les vaisseaux aliens sont des raccourcis Excel.<br>Tapez le bon raccourci pour les détruire !', howLabel:'COMMENT JOUER', howText:'Les ennemis affichent leur nom de raccourci.<br>Tapez les bonnes touches pour les éliminer.<br>Erreur = -10pts. Atterrissage = perte de vie.', bossNote:'Boss dès la vague 7 — plusieurs frappes nécessaires !', launch:'LANCER LE JEU', langLabel:'CHOISIR LA LANGUE', gameOver:'PARTIE TERMINÉE', finalScore:'SCORE FINAL', waveReached:'Vague atteinte', topMsg:'🏆 Top', enterDetails:'Vos informations :', username:'PSEUDO', submit:'SOUMETTRE', playAgain:'REJOUER', checking:'Vérification...', saving:'Sauvegarde...', bossDown:'BOSS ÉLIMINÉ !', bossHit:'BOSS TOUCHÉ !', bossEsc:'BOSS ÉCHAPPÉ ! -2 VIES', destroyed:'DÉTRUIT !', miss:'RATÉ !', wave:'VAGUE', bossIncoming:'— BOSS EN APPROCHE !' },
+  de: { tagline:'Alien-Schiffe sind Excel-Shortcuts.<br>Tippe die richtige Tastenkombination!', howLabel:'SPIELANLEITUNG', howText:'Feinde zeigen ihren Shortcut-Namen.<br>Drücke die richtigen Tasten, um sie zu zerstören.<br>Falsche Kombo = -10Pkt. Landung = Leben verloren.', bossNote:'Boss-Schiffe ab Welle 7 — mehrere Treffer nötig!', launch:'SPIEL STARTEN', langLabel:'SPRACHE WÄHLEN', gameOver:'SPIEL VORBEI', finalScore:'ENDERGEBNIS', waveReached:'Welle erreicht', topMsg:'🏆 Top', enterDetails:'Deine Daten:', username:'BENUTZERNAME', submit:'EINTRAGEN', playAgain:'NOCHMAL', checking:'Prüfung...', saving:'Speichern...', bossDown:'BOSS BESIEGT!', bossHit:'BOSS GETROFFEN!', bossEsc:'BOSS ENTKOMMEN! -2 LEBEN', destroyed:'ZERSTÖRT!', miss:'VERFEHLT!', wave:'WELLE', bossIncoming:'— BOSS IM ANFLUG!' },
+  es: { tagline:'Las naves alien son atajos de Excel.<br>¡Escribe el atajo correcto para destruirlas!', howLabel:'CÓMO JUGAR', howText:'Los enemigos muestran el nombre del atajo.<br>Pulsa las teclas correctas para eliminarlos.<br>Error = -10pts. Aterrizaje = pierdes una vida.', bossNote:'¡Jefes desde la oleada 7 — necesitan varios impactos!', launch:'INICIAR JUEGO', langLabel:'SELECCIONAR IDIOMA', gameOver:'FIN DEL JUEGO', finalScore:'PUNTUACIÓN FINAL', waveReached:'Oleada alcanzada', topMsg:'🏆 Top', enterDetails:'Tus datos:', username:'USUARIO', submit:'ENVIAR', playAgain:'JUGAR DE NUEVO', checking:'Comprobando...', saving:'Guardando...', bossDown:'¡JEFE ELIMINADO!', bossHit:'¡JEFE GOLPEADO!', bossEsc:'¡JEFE ESCAPÓ! -2 VIDAS', destroyed:'¡DESTRUIDO!', miss:'¡FALLO!', wave:'OLEADA', bossIncoming:'— ¡JEFE EN CAMINO!' },
+  pt: { tagline:'As naves aliens são atalhos do Excel.<br>Digite o atalho correto para destruí-las!', howLabel:'COMO JOGAR', howText:'Os inimigos mostram o nome do atalho.<br>Pressione as teclas certas para eliminá-los.<br>Erro = -10pts. Pouso = perde uma vida.', bossNote:'Chefões a partir da onda 7 — precisam de vários golpes!', launch:'INICIAR JOGO', langLabel:'SELECIONAR IDIOMA', gameOver:'FIM DE JOGO', finalScore:'PONTUAÇÃO FINAL', waveReached:'Onda alcançada', topMsg:'🏆 Top', enterDetails:'Seus dados:', username:'USUÁRIO', submit:'ENVIAR', playAgain:'JOGAR NOVAMENTE', checking:'Verificando...', saving:'Salvando...', bossDown:'CHEFÃO DERROTADO!', bossHit:'CHEFÃO ATINGIDO!', bossEsc:'CHEFÃO ESCAPOU! -2 VIDAS', destroyed:'DESTRUÍDO!', miss:'ERRO!', wave:'ONDA', bossIncoming:'— CHEFÃO A CAMINHO!' },
+};
+
+let currentLang = 'en';
+let SHORTCUTS = LANG_SHORTCUTS.en;
+let T = UI_TEXT.en;
+
+function setLang(lang) {
+  currentLang = lang;
+  SHORTCUTS = LANG_SHORTCUTS[lang];
+  T = UI_TEXT[lang];
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang===lang));
+  document.getElementById('tagline').innerHTML = T.tagline;
+  document.getElementById('howLabel').textContent = T.howLabel;
+  document.getElementById('howText').innerHTML = T.howText;
+  document.getElementById('bossNote').textContent = T.bossNote;
+  document.getElementById('startBtn').textContent = T.launch;
+  document.getElementById('langLabel').textContent = T.langLabel;
+}
+document.querySelectorAll('.lang-btn').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
 
 const COUNTRIES = [
   {iso:'AFG',name:'Afghanistan',flag:'🇦🇫'},{iso:'ALB',name:'Albania',flag:'🇦🇱'},{iso:'DZA',name:'Algeria',flag:'🇩🇿'},
@@ -76,50 +284,36 @@ const COUNTRIES = [
   {iso:'BRA',name:'Brazil',flag:'🇧🇷'},{iso:'BRN',name:'Brunei',flag:'🇧🇳'},{iso:'BGR',name:'Bulgaria',flag:'🇧🇬'},
   {iso:'BFA',name:'Burkina Faso',flag:'🇧🇫'},{iso:'BDI',name:'Burundi',flag:'🇧🇮'},{iso:'CPV',name:'Cabo Verde',flag:'🇨🇻'},
   {iso:'KHM',name:'Cambodia',flag:'🇰🇭'},{iso:'CMR',name:'Cameroon',flag:'🇨🇲'},{iso:'CAN',name:'Canada',flag:'🇨🇦'},
-  {iso:'CAF',name:'Central African Rep.',flag:'🇨🇫'},{iso:'TCD',name:'Chad',flag:'🇹🇩'},{iso:'CHL',name:'Chile',flag:'🇨🇱'},
-  {iso:'CHN',name:'China',flag:'🇨🇳'},{iso:'COL',name:'Colombia',flag:'🇨🇴'},{iso:'COM',name:'Comoros',flag:'🇰🇲'},
-  {iso:'COD',name:'Congo (DRC)',flag:'🇨🇩'},{iso:'COG',name:'Congo (Rep.)',flag:'🇨🇬'},{iso:'CRI',name:'Costa Rica',flag:'🇨🇷'},
+  {iso:'CAF',name:'C. African Rep.',flag:'🇨🇫'},{iso:'TCD',name:'Chad',flag:'🇹🇩'},{iso:'CHL',name:'Chile',flag:'🇨🇱'},
+  {iso:'CHN',name:'China',flag:'🇨🇳'},{iso:'COL',name:'Colombia',flag:'🇨🇴'},{iso:'CRI',name:'Costa Rica',flag:'🇨🇷'},
   {iso:'CIV',name:"Côte d'Ivoire",flag:'🇨🇮'},{iso:'HRV',name:'Croatia',flag:'🇭🇷'},{iso:'CUB',name:'Cuba',flag:'🇨🇺'},
-  {iso:'CYP',name:'Cyprus',flag:'🇨🇾'},{iso:'CZE',name:'Czech Republic',flag:'🇨🇿'},{iso:'DNK',name:'Denmark',flag:'🇩🇰'},
-  {iso:'DJI',name:'Djibouti',flag:'🇩🇯'},{iso:'DOM',name:'Dominican Rep.',flag:'🇩🇴'},{iso:'ECU',name:'Ecuador',flag:'🇪🇨'},
-  {iso:'EGY',name:'Egypt',flag:'🇪🇬'},{iso:'SLV',name:'El Salvador',flag:'🇸🇻'},{iso:'GNQ',name:'Equatorial Guinea',flag:'🇬🇶'},
-  {iso:'ERI',name:'Eritrea',flag:'🇪🇷'},{iso:'EST',name:'Estonia',flag:'🇪🇪'},{iso:'SWZ',name:'Eswatini',flag:'🇸🇿'},
-  {iso:'ETH',name:'Ethiopia',flag:'🇪🇹'},{iso:'FJI',name:'Fiji',flag:'🇫🇯'},{iso:'FIN',name:'Finland',flag:'🇫🇮'},
-  {iso:'FRA',name:'France',flag:'🇫🇷'},{iso:'GAB',name:'Gabon',flag:'🇬🇦'},{iso:'GMB',name:'Gambia',flag:'🇬🇲'},
-  {iso:'GEO',name:'Georgia',flag:'🇬🇪'},{iso:'DEU',name:'Germany',flag:'🇩🇪'},{iso:'GHA',name:'Ghana',flag:'🇬🇭'},
-  {iso:'GRC',name:'Greece',flag:'🇬🇷'},{iso:'GTM',name:'Guatemala',flag:'🇬🇹'},{iso:'GIN',name:'Guinea',flag:'🇬🇳'},
-  {iso:'GNB',name:'Guinea-Bissau',flag:'🇬🇼'},{iso:'GUY',name:'Guyana',flag:'🇬🇾'},{iso:'HTI',name:'Haiti',flag:'🇭🇹'},
-  {iso:'HND',name:'Honduras',flag:'🇭🇳'},{iso:'HUN',name:'Hungary',flag:'🇭🇺'},{iso:'ISL',name:'Iceland',flag:'🇮🇸'},
-  {iso:'IND',name:'India',flag:'🇮🇳'},{iso:'IDN',name:'Indonesia',flag:'🇮🇩'},{iso:'IRN',name:'Iran',flag:'🇮🇷'},
-  {iso:'IRQ',name:'Iraq',flag:'🇮🇶'},{iso:'IRL',name:'Ireland',flag:'🇮🇪'},{iso:'ISR',name:'Israel',flag:'🇮🇱'},
-  {iso:'ITA',name:'Italy',flag:'🇮🇹'},{iso:'JAM',name:'Jamaica',flag:'🇯🇲'},{iso:'JPN',name:'Japan',flag:'🇯🇵'},
-  {iso:'JOR',name:'Jordan',flag:'🇯🇴'},{iso:'KAZ',name:'Kazakhstan',flag:'🇰🇿'},{iso:'KEN',name:'Kenya',flag:'🇰🇪'},
-  {iso:'PRK',name:'North Korea',flag:'🇰🇵'},{iso:'KOR',name:'South Korea',flag:'🇰🇷'},{iso:'KWT',name:'Kuwait',flag:'🇰🇼'},
-  {iso:'KGZ',name:'Kyrgyzstan',flag:'🇰🇬'},{iso:'LAO',name:'Laos',flag:'🇱🇦'},{iso:'LVA',name:'Latvia',flag:'🇱🇻'},
-  {iso:'LBN',name:'Lebanon',flag:'🇱🇧'},{iso:'LSO',name:'Lesotho',flag:'🇱🇸'},{iso:'LBR',name:'Liberia',flag:'🇱🇷'},
-  {iso:'LBY',name:'Libya',flag:'🇱🇾'},{iso:'LIE',name:'Liechtenstein',flag:'🇱🇮'},{iso:'LTU',name:'Lithuania',flag:'🇱🇹'},
-  {iso:'LUX',name:'Luxembourg',flag:'🇱🇺'},{iso:'MDG',name:'Madagascar',flag:'🇲🇬'},{iso:'MWI',name:'Malawi',flag:'🇲🇼'},
-  {iso:'MYS',name:'Malaysia',flag:'🇲🇾'},{iso:'MDV',name:'Maldives',flag:'🇲🇻'},{iso:'MLI',name:'Mali',flag:'🇲🇱'},
-  {iso:'MLT',name:'Malta',flag:'🇲🇹'},{iso:'MRT',name:'Mauritania',flag:'🇲🇷'},{iso:'MUS',name:'Mauritius',flag:'🇲🇺'},
-  {iso:'MEX',name:'Mexico',flag:'🇲🇽'},{iso:'MDA',name:'Moldova',flag:'🇲🇩'},{iso:'MCO',name:'Monaco',flag:'🇲🇨'},
-  {iso:'MNG',name:'Mongolia',flag:'🇲🇳'},{iso:'MNE',name:'Montenegro',flag:'🇲🇪'},{iso:'MAR',name:'Morocco',flag:'🇲🇦'},
-  {iso:'MOZ',name:'Mozambique',flag:'🇲🇿'},{iso:'MMR',name:'Myanmar',flag:'🇲🇲'},{iso:'NAM',name:'Namibia',flag:'🇳🇦'},
-  {iso:'NPL',name:'Nepal',flag:'🇳🇵'},{iso:'NLD',name:'Netherlands',flag:'🇳🇱'},{iso:'NZL',name:'New Zealand',flag:'🇳🇿'},
-  {iso:'NIC',name:'Nicaragua',flag:'🇳🇮'},{iso:'NER',name:'Niger',flag:'🇳🇪'},{iso:'NGA',name:'Nigeria',flag:'🇳🇬'},
-  {iso:'MKD',name:'North Macedonia',flag:'🇲🇰'},{iso:'NOR',name:'Norway',flag:'🇳🇴'},{iso:'OMN',name:'Oman',flag:'🇴🇲'},
-  {iso:'PAK',name:'Pakistan',flag:'🇵🇰'},{iso:'PAN',name:'Panama',flag:'🇵🇦'},{iso:'PNG',name:'Papua New Guinea',flag:'🇵🇬'},
-  {iso:'PRY',name:'Paraguay',flag:'🇵🇾'},{iso:'PER',name:'Peru',flag:'🇵🇪'},{iso:'PHL',name:'Philippines',flag:'🇵🇭'},
-  {iso:'POL',name:'Poland',flag:'🇵🇱'},{iso:'PRT',name:'Portugal',flag:'🇵🇹'},{iso:'QAT',name:'Qatar',flag:'🇶🇦'},
-  {iso:'ROU',name:'Romania',flag:'🇷🇴'},{iso:'RUS',name:'Russia',flag:'🇷🇺'},{iso:'RWA',name:'Rwanda',flag:'🇷🇼'},
-  {iso:'SAU',name:'Saudi Arabia',flag:'🇸🇦'},{iso:'SEN',name:'Senegal',flag:'🇸🇳'},{iso:'SRB',name:'Serbia',flag:'🇷🇸'},
-  {iso:'SLE',name:'Sierra Leone',flag:'🇸🇱'},{iso:'SGP',name:'Singapore',flag:'🇸🇬'},{iso:'SVK',name:'Slovakia',flag:'🇸🇰'},
-  {iso:'SVN',name:'Slovenia',flag:'🇸🇮'},{iso:'SOM',name:'Somalia',flag:'🇸🇴'},{iso:'ZAF',name:'South Africa',flag:'🇿🇦'},
-  {iso:'SSD',name:'South Sudan',flag:'🇸🇸'},{iso:'ESP',name:'Spain',flag:'🇪🇸'},{iso:'LKA',name:'Sri Lanka',flag:'🇱🇰'},
-  {iso:'SDN',name:'Sudan',flag:'🇸🇩'},{iso:'SUR',name:'Suriname',flag:'🇸🇷'},{iso:'SWE',name:'Sweden',flag:'🇸🇪'},
-  {iso:'CHE',name:'Switzerland',flag:'🇨🇭'},{iso:'SYR',name:'Syria',flag:'🇸🇾'},{iso:'TWN',name:'Taiwan',flag:'🇹🇼'},
-  {iso:'TJK',name:'Tajikistan',flag:'🇹🇯'},{iso:'TZA',name:'Tanzania',flag:'🇹🇿'},{iso:'THA',name:'Thailand',flag:'🇹🇭'},
-  {iso:'TLS',name:'Timor-Leste',flag:'🇹🇱'},{iso:'TGO',name:'Togo',flag:'🇹🇬'},{iso:'TTO',name:'Trinidad & Tobago',flag:'🇹🇹'},
-  {iso:'TUN',name:'Tunisia',flag:'🇹🇳'},{iso:'TUR',name:'Turkey',flag:'🇹🇷'},{iso:'TKM',name:'Turkmenistan',flag:'🇹🇲'},
+  {iso:'CYP',name:'Cyprus',flag:'🇨🇾'},{iso:'CZE',name:'Czech Rep.',flag:'🇨🇿'},{iso:'DNK',name:'Denmark',flag:'🇩🇰'},
+  {iso:'DOM',name:'Dominican Rep.',flag:'🇩🇴'},{iso:'ECU',name:'Ecuador',flag:'🇪🇨'},{iso:'EGY',name:'Egypt',flag:'🇪🇬'},
+  {iso:'SLV',name:'El Salvador',flag:'🇸🇻'},{iso:'EST',name:'Estonia',flag:'🇪🇪'},{iso:'ETH',name:'Ethiopia',flag:'🇪🇹'},
+  {iso:'FJI',name:'Fiji',flag:'🇫🇯'},{iso:'FIN',name:'Finland',flag:'🇫🇮'},{iso:'FRA',name:'France',flag:'🇫🇷'},
+  {iso:'GAB',name:'Gabon',flag:'🇬🇦'},{iso:'GEO',name:'Georgia',flag:'🇬🇪'},{iso:'DEU',name:'Germany',flag:'🇩🇪'},
+  {iso:'GHA',name:'Ghana',flag:'🇬🇭'},{iso:'GRC',name:'Greece',flag:'🇬🇷'},{iso:'GTM',name:'Guatemala',flag:'🇬🇹'},
+  {iso:'HUN',name:'Hungary',flag:'🇭🇺'},{iso:'ISL',name:'Iceland',flag:'🇮🇸'},{iso:'IND',name:'India',flag:'🇮🇳'},
+  {iso:'IDN',name:'Indonesia',flag:'🇮🇩'},{iso:'IRN',name:'Iran',flag:'🇮🇷'},{iso:'IRQ',name:'Iraq',flag:'🇮🇶'},
+  {iso:'IRL',name:'Ireland',flag:'🇮🇪'},{iso:'ISR',name:'Israel',flag:'🇮🇱'},{iso:'ITA',name:'Italy',flag:'🇮🇹'},
+  {iso:'JAM',name:'Jamaica',flag:'🇯🇲'},{iso:'JPN',name:'Japan',flag:'🇯🇵'},{iso:'JOR',name:'Jordan',flag:'🇯🇴'},
+  {iso:'KAZ',name:'Kazakhstan',flag:'🇰🇿'},{iso:'KEN',name:'Kenya',flag:'🇰🇪'},{iso:'KOR',name:'South Korea',flag:'🇰🇷'},
+  {iso:'KWT',name:'Kuwait',flag:'🇰🇼'},{iso:'LVA',name:'Latvia',flag:'🇱🇻'},{iso:'LBN',name:'Lebanon',flag:'🇱🇧'},
+  {iso:'LTU',name:'Lithuania',flag:'🇱🇹'},{iso:'LUX',name:'Luxembourg',flag:'🇱🇺'},{iso:'MYS',name:'Malaysia',flag:'🇲🇾'},
+  {iso:'MLT',name:'Malta',flag:'🇲🇹'},{iso:'MEX',name:'Mexico',flag:'🇲🇽'},{iso:'MDA',name:'Moldova',flag:'🇲🇩'},
+  {iso:'MCO',name:'Monaco',flag:'🇲🇨'},{iso:'MNG',name:'Mongolia',flag:'🇲🇳'},{iso:'MAR',name:'Morocco',flag:'🇲🇦'},
+  {iso:'MOZ',name:'Mozambique',flag:'🇲🇿'},{iso:'NPL',name:'Nepal',flag:'🇳🇵'},{iso:'NLD',name:'Netherlands',flag:'🇳🇱'},
+  {iso:'NZL',name:'New Zealand',flag:'🇳🇿'},{iso:'NIC',name:'Nicaragua',flag:'🇳🇮'},{iso:'NGA',name:'Nigeria',flag:'🇳🇬'},
+  {iso:'MKD',name:'N. Macedonia',flag:'🇲🇰'},{iso:'NOR',name:'Norway',flag:'🇳🇴'},{iso:'OMN',name:'Oman',flag:'🇴🇲'},
+  {iso:'PAK',name:'Pakistan',flag:'🇵🇰'},{iso:'PAN',name:'Panama',flag:'🇵🇦'},{iso:'PRY',name:'Paraguay',flag:'🇵🇾'},
+  {iso:'PER',name:'Peru',flag:'🇵🇪'},{iso:'PHL',name:'Philippines',flag:'🇵🇭'},{iso:'POL',name:'Poland',flag:'🇵🇱'},
+  {iso:'PRT',name:'Portugal',flag:'🇵🇹'},{iso:'QAT',name:'Qatar',flag:'🇶🇦'},{iso:'ROU',name:'Romania',flag:'🇷🇴'},
+  {iso:'RUS',name:'Russia',flag:'🇷🇺'},{iso:'RWA',name:'Rwanda',flag:'🇷🇼'},{iso:'SAU',name:'Saudi Arabia',flag:'🇸🇦'},
+  {iso:'SEN',name:'Senegal',flag:'🇸🇳'},{iso:'SRB',name:'Serbia',flag:'🇷🇸'},{iso:'SGP',name:'Singapore',flag:'🇸🇬'},
+  {iso:'SVK',name:'Slovakia',flag:'🇸🇰'},{iso:'SVN',name:'Slovenia',flag:'🇸🇮'},{iso:'ZAF',name:'South Africa',flag:'🇿🇦'},
+  {iso:'ESP',name:'Spain',flag:'🇪🇸'},{iso:'LKA',name:'Sri Lanka',flag:'🇱🇰'},{iso:'SWE',name:'Sweden',flag:'🇸🇪'},
+  {iso:'CHE',name:'Switzerland',flag:'🇨🇭'},{iso:'TWN',name:'Taiwan',flag:'🇹🇼'},{iso:'TZA',name:'Tanzania',flag:'🇹🇿'},
+  {iso:'THA',name:'Thailand',flag:'🇹🇭'},{iso:'TUN',name:'Tunisia',flag:'🇹🇳'},{iso:'TUR',name:'Turkey',flag:'🇹🇷'},
   {iso:'UGA',name:'Uganda',flag:'🇺🇬'},{iso:'UKR',name:'Ukraine',flag:'🇺🇦'},{iso:'ARE',name:'UAE',flag:'🇦🇪'},
   {iso:'GBR',name:'United Kingdom',flag:'🇬🇧'},{iso:'USA',name:'United States',flag:'🇺🇸'},{iso:'URY',name:'Uruguay',flag:'🇺🇾'},
   {iso:'UZB',name:'Uzbekistan',flag:'🇺🇿'},{iso:'VEN',name:'Venezuela',flag:'🇻🇪'},{iso:'VNM',name:'Vietnam',flag:'🇻🇳'},
@@ -128,81 +322,32 @@ const COUNTRIES = [
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const waveEl  = document.getElementById('wave');
-const livesEl = document.getElementById('lives');
-const overlay = document.getElementById('overlay');
-const comboHint = document.getElementById('combo-hint');
-const missFlash = document.getElementById('miss-flash');
+const scoreEl=document.getElementById('score'), waveEl=document.getElementById('wave'), livesEl=document.getElementById('lives');
+const overlay=document.getElementById('overlay'), comboHint=document.getElementById('combo-hint'), missFlash=document.getElementById('miss-flash');
 
-let W, H;
-function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-resize(); window.addEventListener('resize', resize);
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize(); window.addEventListener('resize',resize);
 
-const SHORTCUTS = [
-  { name: 'Copy',          keys: ['ctrl','c'],           display: 'Ctrl+C' },
-  { name: 'Paste',         keys: ['ctrl','v'],           display: 'Ctrl+V' },
-  { name: 'Cut',           keys: ['ctrl','x'],           display: 'Ctrl+X' },
-  { name: 'Undo',          keys: ['ctrl','z'],           display: 'Ctrl+Z' },
-  { name: 'Redo',          keys: ['ctrl','y'],           display: 'Ctrl+Y' },
-  { name: 'Save',          keys: ['ctrl','s'],           display: 'Ctrl+S' },
-  { name: 'Select All',    keys: ['ctrl','a'],           display: 'Ctrl+A' },
-  { name: 'Find',          keys: ['ctrl','f'],           display: 'Ctrl+F' },
-  { name: 'Bold',          keys: ['ctrl','b'],           display: 'Ctrl+B' },
-  { name: 'Italic',        keys: ['ctrl','i'],           display: 'Ctrl+I' },
-  { name: 'New Sheet',     keys: ['shift','f11'],        display: 'Shift+F11' },
-  { name: 'AutoSum',       keys: ['alt','='],            display: 'Alt+=' },
-  { name: 'Fill Down',     keys: ['ctrl','d'],           display: 'Ctrl+D' },
-  { name: 'Fill Right',    keys: ['ctrl','r'],           display: 'Ctrl+R' },
-  { name: 'Format Cell',   keys: ['ctrl','1'],           display: 'Ctrl+1' },
-  { name: 'Print',         keys: ['ctrl','p'],           display: 'Ctrl+P' },
-  { name: 'Open',          keys: ['ctrl','o'],           display: 'Ctrl+O' },
-  { name: 'Hyperlink',     keys: ['ctrl','k'],           display: 'Ctrl+K' },
-  { name: 'Go To',         keys: ['ctrl','g'],           display: 'Ctrl+G' },
-  { name: 'Paste Special', keys: ['ctrl','alt','v'],     display: 'Ctrl+Alt+V' },
-  { name: 'Flash Fill',    keys: ['ctrl','e'],           display: 'Ctrl+E' },
-  { name: 'Name Box',      keys: ['ctrl','shift','f3'],  display: 'Ctrl+Shift+F3' },
-  { name: 'Freeze Panes',  keys: ['alt','w'],            display: 'Alt+W' },
-  { name: 'Insert Row',    keys: ['ctrl','shift','+'],   display: 'Ctrl+Shift++' },
-  { name: 'Delete Row',    keys: ['ctrl','-'],           display: 'Ctrl+-' },
-  { name: 'Hide Row',      keys: ['ctrl','9'],           display: 'Ctrl+9' },
-  { name: 'Hide Column',   keys: ['ctrl','0'],           display: 'Ctrl+0' },
-  { name: 'Trace Prev',    keys: ['ctrl','['],           display: 'Ctrl+[' },
-  { name: 'Absolute Ref',  keys: ['f4'],                 display: 'F4' },
-  { name: 'Calc Now',      keys: ['f9'],                 display: 'F9' },
-  { name: 'Insert Fn',     keys: ['shift','f3'],         display: 'Shift+F3' },
-  { name: 'Format $',      keys: ['ctrl','shift','4'],   display: 'Ctrl+Shift+$' },
-  { name: 'Format %',      keys: ['ctrl','shift','5'],   display: 'Ctrl+Shift+%' },
+const BASE_WAVES=[
+  {count:4,speed:0.30,slice:[0,8]},{count:5,speed:0.42,slice:[0,8]},{count:6,speed:0.55,slice:[0,12]},
+  {count:6,speed:0.68,slice:[0,16]},{count:7,speed:0.82,slice:[0,20]},{count:8,speed:1.00,slice:[0,24]},
 ];
-
-const BASE_WAVES = [
-  { pool: SHORTCUTS.slice(0,8),   count: 4,  speed: 0.30 },
-  { pool: SHORTCUTS.slice(0,8),   count: 5,  speed: 0.42 },
-  { pool: SHORTCUTS.slice(0,12),  count: 6,  speed: 0.55 },
-  { pool: SHORTCUTS.slice(0,16),  count: 6,  speed: 0.68 },
-  { pool: SHORTCUTS.slice(0,20),  count: 7,  speed: 0.82 },
-  { pool: SHORTCUTS.slice(0,24),  count: 8,  speed: 1.00 },
-];
-function getWaveCfg(w) {
-  if (w < BASE_WAVES.length) return BASE_WAVES[w];
-  const e = w - BASE_WAVES.length + 1;
-  return { pool: SHORTCUTS, count: Math.min(8+Math.floor(e*0.8),16), speed: 1.0+e*0.12 };
+function getWaveCfg(w){
+  if(w<BASE_WAVES.length){const c=BASE_WAVES[w];return{pool:SHORTCUTS.slice(...c.slice),count:c.count,speed:c.speed};}
+  const e=w-BASE_WAVES.length+1;return{pool:SHORTCUTS,count:Math.min(8+Math.floor(e*0.8),16),speed:1.0+e*0.12};
 }
-function bossHp(w) { return Math.min(3+Math.floor((w-BOSS_START_WAVE)/2),7); }
+function bossHp(w){return Math.min(3+Math.floor((w-BOSS_START_WAVE)/2),7);}
 
-let state='idle', score=0, lives=3, waveNum=0;
-let enemies=[], explosions=[], stars=[], lasers=[];
-let playerX, keysDown={}, hintTimer=null;
-let spawnQueue=[], spawnTimer=0;
+let state='idle',score=0,lives=3,waveNum=0;
+let enemies=[],explosions=[],stars=[],lasers=[];
+let playerX,keysDown={},hintTimer=null,spawnQueue=[],spawnTimer=0;
 const SPAWN_INTERVAL=1200;
 
-function initStars() {
-  stars=[];
-  for(let i=0;i<80;i++) stars.push({x:Math.random()*2000,y:Math.random()*900,r:Math.random()*1.2+0.3,twinkle:Math.random()*Math.PI*2});
-}
+function initStars(){stars=[];for(let i=0;i<80;i++)stars.push({x:Math.random()*2000,y:Math.random()*900,r:Math.random()*1.2+0.3,twinkle:Math.random()*Math.PI*2});}
 initStars();
 
-function spawnWave() {
+function spawnWave(){
   enemies=[]; spawnQueue=[]; spawnTimer=0;
   const cfg=getWaveCfg(waveNum);
   const patterns=['sine','zigzag','swoop','straight','spiral'];
@@ -214,24 +359,19 @@ function spawnWave() {
   if(waveNum>=BOSS_START_WAVE){
     const bp=SHORTCUTS.slice(12);
     const sc=bp[Math.floor(Math.random()*bp.length)];
-    const at=Math.floor(spawnQueue.length/2);
-    spawnQueue.splice(at,0,{sc,speed:cfg.speed*0.75,pattern:'sine',isBoss:true});
+    spawnQueue.splice(Math.floor(spawnQueue.length/2),0,{sc,speed:cfg.speed*0.75,pattern:'sine',isBoss:true});
   }
 }
 
 function tickSpawn(dt){
-  if(!spawnQueue.length)return;
-  spawnTimer-=dt; if(spawnTimer>0)return; spawnTimer=SPAWN_INTERVAL;
-  const item=spawnQueue.shift();
-  const startX=80+Math.random()*(W-160);
-  const hp=item.isBoss?bossHp(waveNum):1;
+  if(!spawnQueue.length)return; spawnTimer-=dt; if(spawnTimer>0)return; spawnTimer=SPAWN_INTERVAL;
+  const item=spawnQueue.shift(), startX=80+Math.random()*(W-160), hp=item.isBoss?bossHp(waveNum):1;
   enemies.push({x:startX,y:-20,sc:item.sc,speed:item.speed,hit:false,flash:0,pattern:item.pattern,t:0,originX:startX,dx:(Math.random()-0.5)*0.6,hintVisible:waveNum<2,bobOffset:Math.random()*Math.PI*2,isBoss:item.isBoss,hp,maxHp:hp});
 }
 
 function startGame(){
-  overlay.style.display='none'; state='playing';
-  score=0; lives=3; waveNum=0; enemies=[]; explosions=[]; lasers=[];
-  playerX=W/2; updateHUD(); spawnWave();
+  overlay.style.display='none'; state='playing'; score=0; lives=3; waveNum=0;
+  enemies=[]; explosions=[]; lasers=[]; playerX=W/2; updateHUD(); spawnWave();
 }
 
 function updateHUD(){
@@ -239,47 +379,45 @@ function updateHUD(){
   livesEl.innerHTML=[0,1,2].map(i=>i<lives?`<span class="heart">♥</span>`:`<span style="opacity:0.2">♥</span>`).join(' ');
 }
 
-function showHint(text,color){ comboHint.textContent=text; comboHint.style.color=color||'#ffcc00'; comboHint.style.opacity='1'; clearTimeout(hintTimer); hintTimer=setTimeout(()=>{comboHint.style.opacity='0';},900); }
-function flashMiss(){ missFlash.style.opacity='1'; setTimeout(()=>{missFlash.style.opacity='0';},150); }
+function showHint(text,color){comboHint.textContent=text;comboHint.style.color=color||'#ffcc00';comboHint.style.opacity='1';clearTimeout(hintTimer);hintTimer=setTimeout(()=>{comboHint.style.opacity='0';},900);}
+function flashMiss(){missFlash.style.opacity='1';setTimeout(()=>{missFlash.style.opacity='0';},150);}
 
 function addExplosion(x,y,big){
   const count=big?36:20;
   for(let i=0;i<count;i++){
-    const angle=(Math.PI*2/count)*i+Math.random()*0.3, spd=(big?2:1.5)+Math.random()*(big?5:3.5);
+    const angle=(Math.PI*2/count)*i+Math.random()*0.3,spd=(big?2:1.5)+Math.random()*(big?5:3.5);
     explosions.push({x,y,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd,life:1,size:(big?2.5:1.5)+Math.random()*3,color:['#00ff88','#ffcc00','#ff4466','#00ccff','#ffffff','#ff9900','#ff44ff'][Math.floor(Math.random()*7)]});
   }
 }
 
-function fireLaser(tx,ty){ lasers.push({x:playerX,y:H-50,tx,ty,life:1}); }
-
-function normalizeKey(e){ let k=e.key.toLowerCase(); if(k==='control')k='ctrl'; if(k===' ')k='space'; return k; }
+function fireLaser(tx,ty){lasers.push({x:playerX,y:H-50,tx,ty,life:1});}
+function normalizeKey(e){let k=e.key.toLowerCase();if(k==='control')k='ctrl';if(k===' ')k='space';return k;}
 function getCurrentCombo(){
   const parts=[];
-  if(keysDown['ctrl'])parts.push('ctrl'); if(keysDown['alt'])parts.push('alt'); if(keysDown['shift'])parts.push('shift');
+  if(keysDown['ctrl'])parts.push('ctrl');if(keysDown['alt'])parts.push('alt');if(keysDown['shift'])parts.push('shift');
   const ignored=new Set(['ctrl','alt','shift','meta','os','contextmenu']);
-  for(const k of Object.keys(keysDown)) if(keysDown[k]&&!ignored.has(k))parts.push(k);
+  for(const k of Object.keys(keysDown))if(keysDown[k]&&!ignored.has(k))parts.push(k);
   return parts;
 }
-function comboMatches(combo,sc){ return sc.keys.slice().sort().join(',')===combo.slice().sort().join(','); }
+function comboMatches(combo,sc){return sc.keys.slice().sort().join(',')===combo.slice().sort().join(',');}
 
 function tryShoot(combo){
-  if(combo.length<1)return;
-  let hit=false;
+  if(combo.length<1)return; let hit=false;
   for(const e of enemies){
     if(!e.hit&&comboMatches(combo,e.sc)){
       fireLaser(e.x,e.y);
       if(e.isBoss){
-        e.hp--; e.flash=1;
-        if(e.hp<=0){ e.hit=true; setTimeout(()=>{addExplosion(e.x,e.y,true);score+=500*(waveNum+1);updateHUD();},120); showHint('BOSS DOWN! +'+(500*(waveNum+1)),'#ff44ff'); }
-        else{ score+=150*(waveNum+1); updateHUD(); showHint('BOSS HIT! +'+(150*(waveNum+1))+'  HP: '+e.hp,'#ff9900'); }
-      } else {
-        e.hit=true; setTimeout(()=>{addExplosion(e.x,e.y,false);score+=100*(waveNum+1);updateHUD();},120);
-        showHint('DESTROYED! +'+(100*(waveNum+1)),'#00ff88');
+        e.hp--;e.flash=1;
+        if(e.hp<=0){e.hit=true;setTimeout(()=>{addExplosion(e.x,e.y,true);score+=500*(waveNum+1);updateHUD();},120);showHint(T.bossDown+' +'+(500*(waveNum+1)),'#ff44ff');}
+        else{score+=150*(waveNum+1);updateHUD();showHint(T.bossHit+' +'+(150*(waveNum+1))+'  HP: '+e.hp,'#ff9900');}
+      }else{
+        e.hit=true;setTimeout(()=>{addExplosion(e.x,e.y,false);score+=100*(waveNum+1);updateHUD();},120);
+        showHint(T.destroyed+' +'+(100*(waveNum+1)),'#00ff88');
       }
-      hit=true; break;
+      hit=true;break;
     }
   }
-  if(!hit){ score=Math.max(0,score-10); updateHUD(); showHint('MISS! -10','#ff4466'); flashMiss(); fireLaser(playerX+(Math.random()-0.5)*200,-30); }
+  if(!hit){score=Math.max(0,score-10);updateHUD();showHint(T.miss+' -10','#ff4466');flashMiss();fireLaser(playerX+(Math.random()-0.5)*200,-30);}
 }
 
 window.addEventListener('keydown',e=>{
@@ -287,87 +425,86 @@ window.addEventListener('keydown',e=>{
   const k=normalizeKey(e);
   if(['ctrl','alt','shift'].includes(k)){keysDown[k]=true;return;}
   if(k==='f5'||k==='f12')return;
-  e.preventDefault(); keysDown[k]=true;
-  const combo=getCurrentCombo(); if(combo.length>=1)tryShoot(combo);
+  e.preventDefault();keysDown[k]=true;
+  const combo=getCurrentCombo();if(combo.length>=1)tryShoot(combo);
 });
 window.addEventListener('keyup',e=>{delete keysDown[normalizeKey(e)];});
 
 function drawPlayerShip(x,y){
-  ctx.save(); ctx.translate(x,y);
+  ctx.save();ctx.translate(x,y);
   const glowR=18+Math.sin(Date.now()*0.008)*4;
   const grd=ctx.createRadialGradient(0,14,2,0,14,glowR);
-  grd.addColorStop(0,'rgba(0,180,255,0.6)'); grd.addColorStop(1,'rgba(0,80,255,0)');
-  ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,14,glowR,0,Math.PI*2); ctx.fill();
+  grd.addColorStop(0,'rgba(0,180,255,0.6)');grd.addColorStop(1,'rgba(0,80,255,0)');
+  ctx.fillStyle=grd;ctx.beginPath();ctx.arc(0,14,glowR,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#00ccff';
-  ctx.beginPath(); ctx.moveTo(-5,10); ctx.lineTo(5,10); ctx.lineTo(3,22+Math.sin(Date.now()*0.015)*4); ctx.lineTo(0,18); ctx.lineTo(-3,22+Math.sin(Date.now()*0.015)*4); ctx.closePath(); ctx.fill();
+  ctx.beginPath();ctx.moveTo(-5,10);ctx.lineTo(5,10);ctx.lineTo(3,22+Math.sin(Date.now()*0.015)*4);ctx.lineTo(0,18);ctx.lineTo(-3,22+Math.sin(Date.now()*0.015)*4);ctx.closePath();ctx.fill();
   const bg=ctx.createLinearGradient(-14,-20,14,10);
-  bg.addColorStop(0,'#00ffcc'); bg.addColorStop(0.5,'#0088ff'); bg.addColorStop(1,'#004488');
+  bg.addColorStop(0,'#00ffcc');bg.addColorStop(0.5,'#0088ff');bg.addColorStop(1,'#004488');
   ctx.fillStyle=bg;
-  ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(6,-10); ctx.lineTo(14,2); ctx.lineTo(10,10); ctx.lineTo(5,8); ctx.lineTo(5,12); ctx.lineTo(-5,12); ctx.lineTo(-5,8); ctx.lineTo(-10,10); ctx.lineTo(-14,2); ctx.lineTo(-6,-10); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle='#00ffff'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(-14,2); ctx.lineTo(-8,-6); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(14,2); ctx.lineTo(8,-6); ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(6,-10);ctx.lineTo(14,2);ctx.lineTo(10,10);ctx.lineTo(5,8);ctx.lineTo(5,12);ctx.lineTo(-5,12);ctx.lineTo(-5,8);ctx.lineTo(-10,10);ctx.lineTo(-14,2);ctx.lineTo(-6,-10);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#00ffff';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(-14,2);ctx.lineTo(-8,-6);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(14,2);ctx.lineTo(8,-6);ctx.stroke();
   const cg=ctx.createRadialGradient(-2,-12,1,0,-10,6);
-  cg.addColorStop(0,'#aaffff'); cg.addColorStop(1,'#005577');
-  ctx.fillStyle=cg; ctx.beginPath(); ctx.ellipse(0,-10,5,7,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(0,-22,2,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#00ffaa'; ctx.fillRect(-16,4,4,8); ctx.fillRect(12,4,4,8);
-  ctx.fillStyle='#ffffff'; ctx.fillRect(-14,3,2,3); ctx.fillRect(12,3,2,3);
+  cg.addColorStop(0,'#aaffff');cg.addColorStop(1,'#005577');
+  ctx.fillStyle=cg;ctx.beginPath();ctx.ellipse(0,-10,5,7,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(0,-22,2,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#00ffaa';ctx.fillRect(-16,4,4,8);ctx.fillRect(12,4,4,8);
+  ctx.fillStyle='#ffffff';ctx.fillRect(-14,3,2,3);ctx.fillRect(12,3,2,3);
   ctx.restore();
 }
 
 function drawAlien(e){
   if(e.hit)return;
-  const ts=Date.now(), bob=Math.sin(ts*0.003+e.bobOffset)*(e.isBoss?3:2);
-  const scale=e.isBoss?1.8:1;
-  ctx.save(); ctx.translate(e.x,e.y+bob); ctx.scale(scale,scale);
-  const pulse=0.85+Math.sin(ts*0.005+e.bobOffset)*0.15, hitFlash=e.flash>0;
+  const ts=Date.now(),bob=Math.sin(ts*0.003+e.bobOffset)*(e.isBoss?3:2),scale=e.isBoss?1.8:1;
+  ctx.save();ctx.translate(e.x,e.y+bob);ctx.scale(scale,scale);
+  const pulse=0.85+Math.sin(ts*0.005+e.bobOffset)*0.15,hitFlash=e.flash>0;
   ctx.globalAlpha=hitFlash?0.5+Math.sin(e.flash*20)*0.5:1;
-  const rimBase=e.isBoss?'#ff4400':'#cc44ff', bodyDark=e.isBoss?'#880000':'#6622cc', bodyLight=e.isBoss?'#cc2200':'#9944ee', domeCol=e.isBoss?'#ff6600':'#aa66ff', eyeCol=e.isBoss?'#ffff00':'#00ffee';
-  ctx.save(); ctx.globalAlpha*=0.3; ctx.strokeStyle=hitFlash?'#ffffff':rimBase; ctx.lineWidth=e.isBoss?4:3;
-  ctx.beginPath(); ctx.ellipse(0,2,22*pulse,10*pulse,0,0,Math.PI*2); ctx.stroke();
+  const rimBase=e.isBoss?'#ff4400':'#cc44ff',bodyDark=e.isBoss?'#880000':'#6622cc',bodyLight=e.isBoss?'#cc2200':'#9944ee',domeCol=e.isBoss?'#ff6600':'#aa66ff',eyeCol=e.isBoss?'#ffff00':'#00ffee';
+  ctx.save();ctx.globalAlpha*=0.3;ctx.strokeStyle=hitFlash?'#ffffff':rimBase;ctx.lineWidth=e.isBoss?4:3;
+  ctx.beginPath();ctx.ellipse(0,2,22*pulse,10*pulse,0,0,Math.PI*2);ctx.stroke();
   if(e.isBoss){ctx.globalAlpha*=0.5;ctx.beginPath();ctx.ellipse(0,2,28*pulse,13*pulse,0,0,Math.PI*2);ctx.stroke();}
   ctx.restore();
-  ctx.fillStyle=hitFlash?'#ff0000':bodyDark; ctx.beginPath(); ctx.ellipse(0,4,20,8,0,0,Math.PI); ctx.fill();
-  ctx.fillStyle=hitFlash?'#ff6688':bodyLight; ctx.beginPath(); ctx.ellipse(0,2,22,6,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=hitFlash?'#ff0000':bodyDark;ctx.beginPath();ctx.ellipse(0,4,20,8,0,0,Math.PI);ctx.fill();
+  ctx.fillStyle=hitFlash?'#ff6688':bodyLight;ctx.beginPath();ctx.ellipse(0,2,22,6,0,0,Math.PI*2);ctx.fill();
   const rc=e.isBoss?8:6;
   for(let i=0;i<rc;i++){
     const a=(Math.PI*2/rc)*i+ts*(e.isBoss?0.004:0.002);
     ctx.fillStyle=hitFlash?'#ffffff':(i%2===0?(e.isBoss?'#ff6600':'#ff44ff'):(e.isBoss?'#ffcc00':'#44ffff'));
-    ctx.beginPath(); ctx.arc(Math.cos(a)*16,Math.sin(a)*4+2,e.isBoss?3:2.5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath();ctx.arc(Math.cos(a)*16,Math.sin(a)*4+2,e.isBoss?3:2.5,0,Math.PI*2);ctx.fill();
   }
-  ctx.fillStyle=hitFlash?'#ff4466':domeCol; ctx.beginPath(); ctx.ellipse(0,0,13,10,0,Math.PI,Math.PI*2); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.ellipse(-3,-5,5,3,-0.4,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=hitFlash?'#ff0000':eyeCol; ctx.beginPath(); ctx.ellipse(0,-3,5,4,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=hitFlash?'#440000':(e.isBoss?'#332200':'#003333'); ctx.beginPath(); ctx.ellipse(1,-3,2.5,2,0,0,Math.PI*2); ctx.fill();
-  ctx.save(); ctx.globalAlpha*=(0.15+Math.sin(ts*0.004)*0.08); ctx.fillStyle=hitFlash?'#ff4400':(e.isBoss?'#ff6600':'#aa44ff');
-  ctx.beginPath(); ctx.moveTo(-8,8); ctx.lineTo(8,8); ctx.lineTo(e.isBoss?18:14,28); ctx.lineTo(e.isBoss?-18:-14,28); ctx.closePath(); ctx.fill(); ctx.restore();
+  ctx.fillStyle=hitFlash?'#ff4466':domeCol;ctx.beginPath();ctx.ellipse(0,0,13,10,0,Math.PI,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.25)';ctx.beginPath();ctx.ellipse(-3,-5,5,3,-0.4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=hitFlash?'#ff0000':eyeCol;ctx.beginPath();ctx.ellipse(0,-3,5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=hitFlash?'#440000':(e.isBoss?'#332200':'#003333');ctx.beginPath();ctx.ellipse(1,-3,2.5,2,0,0,Math.PI*2);ctx.fill();
+  ctx.save();ctx.globalAlpha*=(0.15+Math.sin(ts*0.004)*0.08);ctx.fillStyle=hitFlash?'#ff4400':(e.isBoss?'#ff6600':'#aa44ff');
+  ctx.beginPath();ctx.moveTo(-8,8);ctx.lineTo(8,8);ctx.lineTo(e.isBoss?18:14,28);ctx.lineTo(e.isBoss?-18:-14,28);ctx.closePath();ctx.fill();ctx.restore();
   ctx.restore();
-  ctx.save(); ctx.translate(e.x,e.y+bob); ctx.globalAlpha=1;
+  ctx.save();ctx.translate(e.x,e.y+bob);ctx.globalAlpha=1;
   if(e.isBoss){ctx.fillStyle='#ff4400';ctx.font='bold 10px Courier New';ctx.textAlign='center';ctx.fillText('◆ BOSS ◆',0,-28);}
-  ctx.fillStyle='#ffffff'; ctx.font=`bold ${e.isBoss?13:11}px Courier New`; ctx.textAlign='center';
+  ctx.fillStyle='#ffffff';ctx.font=`bold ${e.isBoss?13:11}px Courier New`;ctx.textAlign='center';
   ctx.fillText(e.sc.name,0,e.isBoss?46:38);
   if(waveNum<10&&e.hintVisible){ctx.fillStyle='#ffcc00';ctx.font=`${e.isBoss?11:10}px Courier New`;ctx.fillText(e.sc.display,0,e.isBoss?62:52);}
   if(e.isBoss){
     const bw=60,bh=6,bx=-30,by=68;
-    ctx.fillStyle='#330000'; ctx.fillRect(bx,by,bw,bh);
-    const hf=e.hp/e.maxHp, hc=hf>0.6?'#ff4400':hf>0.3?'#ff9900':'#ff0000';
-    ctx.fillStyle=hc; ctx.fillRect(bx,by,bw*hf,bh);
-    ctx.strokeStyle='#ff6600'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,bh);
+    ctx.fillStyle='#330000';ctx.fillRect(bx,by,bw,bh);
+    const hf=e.hp/e.maxHp,hc=hf>0.6?'#ff4400':hf>0.3?'#ff9900':'#ff0000';
+    ctx.fillStyle=hc;ctx.fillRect(bx,by,bw*hf,bh);
+    ctx.strokeStyle='#ff6600';ctx.lineWidth=1;ctx.strokeRect(bx,by,bw,bh);
   }
   ctx.restore();
 }
 
 let lastTime=0;
 function loop(ts){
-  const dt=Math.min(ts-lastTime,50); lastTime=ts;
-  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a0a1a'; ctx.fillRect(0,0,W,H);
+  const dt=Math.min(ts-lastTime,50);lastTime=ts;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,W,H);
   for(const s of stars){s.twinkle+=0.02;ctx.fillStyle=`rgba(200,220,255,${0.4+Math.sin(s.twinkle)*0.3})`;ctx.beginPath();ctx.arc(s.x%W,s.y%H,s.r,0,Math.PI*2);ctx.fill();}
   if(state==='playing'||state==='between'){
     tickSpawn(dt);
     const td=H-80;
     enemies=enemies.filter(e=>{
-      e.t+=dt*0.001; e.y+=e.speed*(dt/16);
+      e.t+=dt*0.001;e.y+=e.speed*(dt/16);
       if(!e.hintVisible&&waveNum>=2&&e.y>=td*0.25)e.hintVisible=true;
       if(e.pattern==='sine')e.x=e.originX+Math.sin(e.t*3)*60;
       else if(e.pattern==='zigzag')e.x=e.originX+(Math.sin(e.t*5)>0?1:-1)*50;
@@ -376,53 +513,49 @@ function loop(ts){
       else{e.x+=e.dx*(dt/16);if(e.x<30)e.dx=Math.abs(e.dx);if(e.x>W-30)e.dx=-Math.abs(e.dx);}
       e.x=Math.max(30,Math.min(W-30,e.x));
       if(!e.hit&&e.y>H-80){
-        lives=Math.max(0,lives-(e.isBoss?2:1)); updateHUD(); addExplosion(e.x,e.y,e.isBoss);
-        if(e.isBoss)showHint('BOSS ESCAPED! -2 LIVES','#ff0000');
-        if(lives<=0){state='over';setTimeout(gameOver,400);} return false;
+        lives=Math.max(0,lives-(e.isBoss?2:1));updateHUD();addExplosion(e.x,e.y,e.isBoss);
+        if(e.isBoss)showHint(T.bossEsc,'#ff0000');
+        if(lives<=0){state='over';setTimeout(gameOver,400);}return false;
       }
       if(e.flash>0)e.flash-=dt/150;
       return !e.hit;
     });
     for(const e of enemies)drawAlien(e);
     for(const l of lasers){
-      ctx.save(); ctx.globalAlpha=l.life*0.3; ctx.strokeStyle='#00ffff'; ctx.lineWidth=8; ctx.shadowColor='#00ffff'; ctx.shadowBlur=16;
-      ctx.beginPath(); ctx.moveTo(l.x,l.y); ctx.lineTo(l.tx,l.ty); ctx.stroke();
-      ctx.globalAlpha=l.life; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(l.x,l.y); ctx.lineTo(l.tx,l.ty); ctx.stroke(); ctx.restore();
+      ctx.save();ctx.globalAlpha=l.life*0.3;ctx.strokeStyle='#00ffff';ctx.lineWidth=8;ctx.shadowColor='#00ffff';ctx.shadowBlur=16;
+      ctx.beginPath();ctx.moveTo(l.x,l.y);ctx.lineTo(l.tx,l.ty);ctx.stroke();
+      ctx.globalAlpha=l.life;ctx.strokeStyle='#ffffff';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(l.x,l.y);ctx.lineTo(l.tx,l.ty);ctx.stroke();ctx.restore();
     }
     lasers=lasers.filter(l=>{l.life-=dt/200;return l.life>0;});
     drawPlayerShip(playerX,H-52);
-    ctx.strokeStyle='rgba(0,255,136,0.15)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,H-70); ctx.lineTo(W,H-70); ctx.stroke();
+    ctx.strokeStyle='rgba(0,255,136,0.15)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,H-70);ctx.lineTo(W,H-70);ctx.stroke();
     if(state==='playing'&&enemies.length===0&&spawnQueue.length===0){
-      state='between'; waveNum++; updateHUD();
+      state='between';waveNum++;updateHUD();
       const ibw=waveNum>=BOSS_START_WAVE;
-      showHint('WAVE '+(waveNum+1)+(ibw?' — BOSS INCOMING!':'')+'!',ibw?'#ff4400':'#00ccff');
+      showHint(T.wave+' '+(waveNum+1)+(ibw?' '+T.bossIncoming:'')+'!',ibw?'#ff4400':'#00ccff');
       setTimeout(()=>{state='playing';spawnWave();},900);
     }
   }
   for(let i=explosions.length-1;i>=0;i--){
-    const p=explosions[i]; p.x+=p.vx; p.y+=p.vy; p.life-=0.035;
+    const p=explosions[i];p.x+=p.vx;p.y+=p.vy;p.life-=0.035;
     if(p.life<=0){explosions.splice(i,1);continue;}
-    ctx.globalAlpha=p.life; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
   }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-// ─── JSONBIN ─────────────────────────────────────────────────────
+let scoresCache=null,scoresCacheTime=0;
+const CACHE_TTL=5*60*1000;
 const configured=JSONBIN_BIN_ID!=='YOUR_BIN_ID_HERE'&&JSONBIN_API_KEY!=='YOUR_API_KEY_HERE';
-let scoresCache=null, scoresCacheTime=0;
-const CACHE_TTL=5*60*1000; // 5 minutes
 
 async function fetchScores(force){
   if(!configured)return[];
   if(!force&&scoresCache&&(Date.now()-scoresCacheTime)<CACHE_TTL)return scoresCache;
   try{
     const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`,{headers:{'X-Master-Key':JSONBIN_API_KEY}});
-    const d=await r.json();
-    scoresCache=Array.isArray(d.record)?d.record:[];
-    scoresCacheTime=Date.now();
-    return scoresCache;
+    const d=await r.json();scoresCache=Array.isArray(d.record)?d.record:[];scoresCacheTime=Date.now();return scoresCache;
   }catch(e){return scoresCache||[];}
 }
 async function saveScores(entries){
@@ -433,12 +566,11 @@ async function addScore(name,iso,flag,sc,wave){
   const entries=await fetchScores(true);
   entries.push({name,iso,flag,score:sc,wave,date:new Date().toLocaleDateString()});
   entries.sort((a,b)=>b.score-a.score);
-  const trimmed=entries.slice(0,50); await saveScores(trimmed); return trimmed.slice(0,LEADERBOARD_MAX);
+  const trimmed=entries.slice(0,50);await saveScores(trimmed);return trimmed.slice(0,LEADERBOARD_MAX);
 }
 async function isNameClean(name){
   try{const r=await fetch(`https://www.purgomalum.com/service/containsprofanity?text=${encodeURIComponent(name)}`);return(await r.text()).trim()==='false';}catch(e){return true;}
 }
-
 function renderLB(entries,highlightName,highlightScore){
   if(!entries.length)return'<div class="lb-loading">No scores yet — be the first!</div>';
   const medals=['gold','silver','bronze'];
@@ -447,53 +579,51 @@ function renderLB(entries,highlightName,highlightScore){
     const cls=[medals[i]||'',isYou?'you':''].filter(Boolean).join(' ');
     const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
     const flagHtml=e.flag?`<span class="flag">${e.flag}</span><span class="iso">${e.iso||''}</span>`:'<span class="iso" style="width:52px"></span>';
-    return `<div class="lb-row ${cls}"><span class="rank">${medal}</span>${flagHtml}<span class="name">${e.name}</span><span class="wave">W${e.wave}</span><span class="pts">${e.score.toLocaleString()}</span></div>`;
+    return`<div class="lb-row ${cls}"><span class="rank">${medal}</span>${flagHtml}<span class="name">${e.name}</span><span class="wave">W${e.wave}</span><span class="pts">${e.score.toLocaleString()}</span></div>`;
   }).join('');
 }
-
 function buildCountrySelect(){
   const opts=COUNTRIES.map(c=>`<option value="${c.iso}">${c.flag} ${c.name} (${c.iso})</option>`).join('');
-  return`<select class="game-select" id="countrySelect"><option value="">— Select your country —</option>${opts}</select>`;
+  return`<select class="game-select" id="countrySelect"><option value="">— Select country —</option>${opts}</select>`;
 }
 
 async function gameOver(){
-  const finalScore=score, finalWave=waveNum+1;
+  const finalScore=score,finalWave=waveNum+1;
   overlay.style.display='flex';
   overlay.innerHTML=`
-    <h1 style="color:#ff4466">GAME OVER</h1>
-    <p class="big">FINAL SCORE: ${finalScore.toLocaleString()}</p>
-    <p>You reached Wave ${finalWave}</p>
+    <h1 style="color:#ff4466">${T.gameOver}</h1>
+    <p class="big">${T.finalScore}: ${finalScore.toLocaleString()}</p>
+    <p>${T.waveReached} ${finalWave}</p>
     ${!configured?`<div class="config-notice">⚠️ Add your JSONBin credentials to enable the leaderboard.</div>`:''}
     <div class="lb" id="lbPanel"><div class="lb-loading">Loading leaderboard...</div></div>
-    <button class="sec" id="skipBtn" style="margin-top:16px">PLAY AGAIN</button>`;
+    <button class="sec" id="skipBtn" style="margin-top:16px">${T.playAgain}</button>`;
   document.getElementById('skipBtn').addEventListener('click',()=>location.reload());
 
-  const entries=await fetchScores();
+  const entries=await fetchScores(true);
   const top=entries.slice(0,LEADERBOARD_MAX);
   const qualifies=!configured?false:(top.length<LEADERBOARD_MAX||finalScore>=(top[top.length-1]?.score||0));
 
   if(qualifies){
     document.getElementById('lbPanel').insertAdjacentHTML('beforebegin',`
-      <p style="margin-top:10px;color:#ffcc00;font-size:13px;">🏆 You made the top ${LEADERBOARD_MAX}! Enter your details:</p>
-      <input class="game-input" id="nameInput" type="text" placeholder="USERNAME" maxlength="20" autocomplete="off"/>
+      <p style="margin-top:10px;color:#ffcc00;font-size:13px;">${T.topMsg} ${LEADERBOARD_MAX}! ${T.enterDetails}</p>
+      <input class="game-input" id="nameInput" type="text" placeholder="${T.username}" maxlength="20" autocomplete="off"/>
       ${buildCountrySelect()}
       <div class="err" id="nameErr"></div>
-      <button id="submitBtn">SUBMIT SCORE</button>`);
+      <button id="submitBtn">${T.submit}</button>`);
 
     async function doSubmit(){
       const nameInput=document.getElementById('nameInput'),errEl=document.getElementById('nameErr'),submitBtn=document.getElementById('submitBtn');
       const countrySelect=document.getElementById('countrySelect');
-      const name=(nameInput?.value||'').trim();
-      const isoVal=countrySelect?.value||'';
+      const name=(nameInput?.value||'').trim(),isoVal=countrySelect?.value||'';
       const countryObj=COUNTRIES.find(c=>c.iso===isoVal);
       if(!name){errEl.textContent='Please enter a username.';return;}
-      if(name.length<2){errEl.textContent='Name must be at least 2 characters.';return;}
-      submitBtn.textContent='Checking...'; submitBtn.disabled=true; errEl.textContent='';
+      if(name.length<2){errEl.textContent='Min 2 characters.';return;}
+      submitBtn.textContent=T.checking;submitBtn.disabled=true;errEl.textContent='';
       const clean=await isNameClean(name);
-      if(!clean){errEl.textContent='That name is not allowed. Please choose another.';submitBtn.textContent='SUBMIT SCORE';submitBtn.disabled=false;nameInput.value='';nameInput.focus();return;}
-      submitBtn.textContent='Saving...';
+      if(!clean){errEl.textContent='Name not allowed. Try another.';submitBtn.textContent=T.submit;submitBtn.disabled=false;nameInput.value='';nameInput.focus();return;}
+      submitBtn.textContent=T.saving;
       const updated=await addScore(name,countryObj?.iso||'',countryObj?.flag||'',finalScore,finalWave);
-      document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(updated,name,finalScore);
+      document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX}</div>`+renderLB(updated,name,finalScore);
       submitBtn.style.display='none';
       document.getElementById('nameInput').style.display='none';
       document.getElementById('countrySelect').style.display='none';
@@ -502,15 +632,14 @@ async function gameOver(){
     document.getElementById('submitBtn').addEventListener('click',doSubmit);
     document.getElementById('nameInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSubmit();});
   }
-
-  document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(top,'',-1);
+  document.getElementById('lbPanel').innerHTML=`<div class="lb-title">TOP ${LEADERBOARD_MAX}</div>`+renderLB(top,'',-1);
 }
 
 async function showStartLB(){
-  const lb=document.getElementById('startLb'); if(!lb)return;
-  if(!configured){lb.innerHTML=`<div class="config-notice" style="margin-top:12px">⚠️ Add your JSONBin credentials to enable the leaderboard.</div>`;return;}
+  const lb=document.getElementById('startLb');if(!lb)return;
+  if(!configured){lb.innerHTML=`<div class="config-notice" style="margin-top:12px">⚠️ Add JSONBin credentials to enable leaderboard.</div>`;return;}
   const entries=await fetchScores();
-  lb.innerHTML=entries.length?`<div class="lb-title" style="margin-top:12px">TOP ${LEADERBOARD_MAX} LEADERBOARD</div>`+renderLB(entries.slice(0,LEADERBOARD_MAX),'',0):'<div class="lb-loading" style="margin-top:10px">No scores yet — be the first!</div>';
+  lb.innerHTML=entries.length?`<div class="lb-title" style="margin-top:12px">TOP ${LEADERBOARD_MAX}</div>`+renderLB(entries.slice(0,LEADERBOARD_MAX),'',0):`<div class="lb-loading" style="margin-top:10px">No scores yet — be the first!</div>`;
 }
 
 document.getElementById('startBtn').addEventListener('click',startGame);

@@ -113,8 +113,6 @@ LANG_SHORTCUTS.en = [
   { name:'Absolute Ref', keys:['f4'],                display:'F4' },
   { name:'Calc Now',     keys:['f9'],                display:'F9' },
   { name:'Insert Fn',    keys:['shift','f3'],        display:'Shift+F3' },
-  { name:'Format $',     keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
-  { name:'Format %',     keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' }
 ];
 
 LANG_SHORTCUTS.fr = [
@@ -142,8 +140,6 @@ LANG_SHORTCUTS.fr = [
   { name:'Ref. absolue', keys:['f4'],                display:'F4' },
   { name:'Calculer',     keys:['f9'],                display:'F9' },
   { name:'Inserer fn',   keys:['shift','f3'],        display:'Shift+F3' },
-  { name:'Format euros', keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
-  { name:'Format pct',   keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
   { name:'Inserer ligne',keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
   { name:'Suppr. ligne', keys:['ctrl','-'],          display:'Ctrl+-' },
   { name:'Masquer ligne',keys:['ctrl','9'],          display:'Ctrl+9' },
@@ -175,8 +171,6 @@ LANG_SHORTCUTS.de = [
   { name:'Abs. Bezug',   keys:['f4'],                display:'F4' },
   { name:'Berechnen',    keys:['f9'],                display:'F9' },
   { name:'Funktion einf',keys:['shift','f3'],        display:'Shift+F3' },
-  { name:'Format Euro',  keys:['ctrl','shift','4'],  display:'Strg+Shift+$' },
-  { name:'Format Pzt',   keys:['ctrl','shift','5'],  display:'Strg+Shift+%' },
   { name:'Zeile einf.',  keys:['ctrl','shift','+'],  display:'Strg+Shift++' },
   { name:'Zeile loeschen',keys:['ctrl','-'],         display:'Strg+-' },
   { name:'Zeile ausbl.', keys:['ctrl','9'],          display:'Strg+9' },
@@ -208,8 +202,6 @@ LANG_SHORTCUTS.es = [
   { name:'Ref. absoluta',keys:['f4'],                display:'F4' },
   { name:'Calcular',     keys:['f9'],                display:'F9' },
   { name:'Insertar fn',  keys:['shift','f3'],        display:'Shift+F3' },
-  { name:'Formato dolar',keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
-  { name:'Formato pct',  keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
   { name:'Insertar fila',keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
   { name:'Eliminar fila',keys:['ctrl','-'],          display:'Ctrl+-' },
   { name:'Ocultar fila', keys:['ctrl','9'],          display:'Ctrl+9' },
@@ -241,8 +233,6 @@ LANG_SHORTCUTS.pt = [
   { name:'Ref. absoluta',keys:['f4'],                display:'F4' },
   { name:'Calcular',     keys:['f9'],                display:'F9' },
   { name:'Inserir fn',   keys:['shift','f3'],        display:'Shift+F3' },
-  { name:'Formato RS',   keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
-  { name:'Formato pct',  keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
   { name:'Inserir linha',keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
   { name:'Excluir linha',keys:['ctrl','-'],          display:'Ctrl+-' },
   { name:'Ocultar linha',keys:['ctrl','9'],          display:'Ctrl+9' },
@@ -274,8 +264,6 @@ LANG_SHORTCUTS.nl = [
   { name:'Abs. verwijs.',keys:['f4'],                display:'F4' },
   { name:'Berekenen',    keys:['f9'],                display:'F9' },
   { name:'Functie inv.', keys:['shift','f3'],        display:'Shift+F3' },
-  { name:'Opmaak euro',  keys:['ctrl','shift','4'],  display:'Ctrl+Shift+$' },
-  { name:'Opmaak pct',   keys:['ctrl','shift','5'],  display:'Ctrl+Shift+%' },
   { name:'Rij invoegen', keys:['ctrl','shift','+'],  display:'Ctrl+Shift++' },
   { name:'Rij verwijder',keys:['ctrl','-'],          display:'Ctrl+-' },
   { name:'Rij verbergen',keys:['ctrl','9'],          display:'Ctrl+9' },
@@ -613,6 +601,82 @@ function drawAlien(e) {
   ctx.restore();
 }
 
+var waveAnim = null; // { timer, duration, waveNum, isBoss }
+
+function startWaveAnim(num, isBoss, cb) {
+  waveAnim = { timer: 0, duration: 1600, waveNum: num, isBoss: isBoss, cb: cb };
+}
+
+function drawWaveAnim(dt) {
+  if (!waveAnim) return;
+  waveAnim.timer += dt;
+  var progress = waveAnim.timer / waveAnim.duration; // 0 to 1
+  if (progress >= 1) { waveAnim.cb(); waveAnim = null; return; }
+
+  // fade in then out
+  var alpha = progress < 0.3 ? progress / 0.3 : progress > 0.7 ? 1 - (progress - 0.7) / 0.3 : 1;
+  // scale: starts big, settles, then fades
+  var scale = progress < 0.2 ? 1.8 - (progress / 0.2) * 0.8 : 1.0;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(scale, scale);
+
+  if (waveAnim.isBoss) {
+    // shake on boss waves
+    var shake = progress < 0.6 ? (Math.random() - 0.5) * 10 * (1 - progress) : 0;
+    ctx.translate(shake, shake * 0.5);
+
+    // red glow background
+    ctx.save();
+    ctx.globalAlpha *= 0.18;
+    ctx.fillStyle = '#ff2200';
+    ctx.beginPath(); ctx.arc(0, 0, 220, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = '#ff4400';
+    ctx.font = 'bold 64px Courier New';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(T.wave + ' ' + waveAnim.waveNum, 0, -24);
+
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 22px Courier New';
+    ctx.fillText(T.bossIncoming, 0, 28);
+
+    // pulsing warning lines
+    ctx.strokeStyle = '#ff4400';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha *= 0.4 + Math.sin(waveAnim.timer * 0.02) * 0.3;
+    for (var i = 0; i < 3; i++) {
+      var r = 140 + i * 30;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    }
+  } else {
+    // green glow background
+    ctx.save();
+    ctx.globalAlpha *= 0.12;
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath(); ctx.arc(0, 0, 180, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = '#00ff88';
+    ctx.font = 'bold 68px Courier New';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(T.wave + ' ' + waveAnim.waveNum, 0, 0);
+
+    // subtle ring
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha *= 0.3;
+    ctx.beginPath(); ctx.arc(0, 0, 130 + Math.sin(waveAnim.timer * 0.015) * 8, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 var lastTime = 0;
 function loop(ts) {
   var dt = Math.min(ts - lastTime, 50); lastTime = ts;
@@ -658,10 +722,10 @@ function loop(ts) {
     if (state==='playing'&&enemies.length===0&&spawnQueue.length===0) {
       state='between'; waveNum++; updateHUD();
       var ibw=waveNum>=BOSS_START_WAVE;
-      showHint(T.wave+' '+(waveNum+1)+(ibw?' -- '+T.bossIncoming:'')+'!',ibw?'#ff4400':'#00ccff');
-      setTimeout(function(){state='playing';spawnWave();},900);
+      startWaveAnim(waveNum+1, ibw, function() { state='playing'; spawnWave(); });
     }
   }
+  drawWaveAnim(dt);
   for (var pi=explosions.length-1; pi>=0; pi--) {
     var p=explosions[pi]; p.x+=p.vx; p.y+=p.vy; p.life-=0.035;
     if (p.life<=0){explosions.splice(pi,1);continue;}

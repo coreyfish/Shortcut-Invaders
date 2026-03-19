@@ -412,16 +412,26 @@ requestAnimationFrame(loop);
 
 // ─── JSONBIN ─────────────────────────────────────────────────────
 const configured=JSONBIN_BIN_ID!=='YOUR_BIN_ID_HERE'&&JSONBIN_API_KEY!=='YOUR_API_KEY_HERE';
-async function fetchScores(){
+let scoresCache=null, scoresCacheTime=0;
+const CACHE_TTL=5*60*1000; // 5 minutes
+
+async function fetchScores(force){
   if(!configured)return[];
-  try{const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`,{headers:{'X-Master-Key':JSONBIN_API_KEY}});const d=await r.json();return Array.isArray(d.record)?d.record:[];}catch(e){return[];}
+  if(!force&&scoresCache&&(Date.now()-scoresCacheTime)<CACHE_TTL)return scoresCache;
+  try{
+    const r=await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`,{headers:{'X-Master-Key':JSONBIN_API_KEY}});
+    const d=await r.json();
+    scoresCache=Array.isArray(d.record)?d.record:[];
+    scoresCacheTime=Date.now();
+    return scoresCache;
+  }catch(e){return scoresCache||[];}
 }
 async function saveScores(entries){
   if(!configured)return;
   try{await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_API_KEY},body:JSON.stringify(entries)});}catch(e){}
 }
 async function addScore(name,iso,flag,sc,wave){
-  const entries=await fetchScores();
+  const entries=await fetchScores(true);
   entries.push({name,iso,flag,score:sc,wave,date:new Date().toLocaleDateString()});
   entries.sort((a,b)=>b.score-a.score);
   const trimmed=entries.slice(0,50); await saveScores(trimmed); return trimmed.slice(0,LEADERBOARD_MAX);
